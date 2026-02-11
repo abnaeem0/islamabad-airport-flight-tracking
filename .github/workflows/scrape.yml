@@ -32,4 +32,12 @@ jobs:
         DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         DB_PORT: ${{ secrets.DB_PORT }}
       run: |
-        python scraper.py
+          echo "Debug: Checking environment variables (masked)"
+          [ -z "$DB_HOST" ] && echo "DB_HOST missing" || echo "DB_HOST OK"
+          [ -z "$DB_NAME" ] && echo "DB_NAME missing" || echo "DB_NAME OK"
+          [ -z "$DB_USER" ] && echo "DB_USER missing" || echo "DB_USER OK"
+          [ -z "$DB_PASSWORD" ] && echo "DB_PASSWORD missing" || echo "DB_PASSWORD OK"
+          [ -z "$DB_PORT" ] && echo "DB_PORT missing" || echo "DB_PORT OK"
+
+          echo "Running scraper.py..."
+          python scraper.py
