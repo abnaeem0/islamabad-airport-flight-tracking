@@ -14,7 +14,7 @@ try:
         user=DB_USER,
         password=DB_PASSWORD,
         port=DB_PORT,
-        sslmode="require"   # <- important for Supabase
+        sslmode="require"  # required for Supabase pooler
     )
     print("✅ DB connection successful!", flush=True)
     conn.close()
