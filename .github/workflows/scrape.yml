@@ -6,6 +6,7 @@ on:
 jobs:
   db-test:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
@@ -17,25 +18,11 @@ jobs:
       - name: Install dependencies
         run: pip install psycopg2-binary
 
-      - name: Check secrets
-        env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-        run: |
-          echo "DB_HOST: ${DB_HOST:+set}"
-          echo "DB_NAME: ${DB_NAME:+set}"
-          echo "DB_USER: ${DB_USER:+set}"
-          echo "DB_PASSWORD: ${DB_PASSWORD:+set}"
-          echo "DB_PORT: ${DB_PORT:+set}"
-
       - name: Run scraper.py
         env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
+          DB_HOST: ${{ secrets.DB_HOST }}        # aws-1-ap-south-1.pooler.supabase.com
+          DB_PORT: ${{ secrets.DB_PORT }}        # 5432
+          DB_NAME: ${{ secrets.DB_NAME }}        # postgres
+          DB_USER: ${{ secrets.DB_USER }}        # postgres.sbaweaytsmdmhaclgcwr
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_PORT: ${{ secrets.DB_PORT }}
         run: python -u scraper.py
