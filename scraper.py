@@ -1,54 +1,53 @@
 #!/usr/bin/env python3
 import os
-import requests
 import datetime
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import requests
 import urllib3
+import psycopg2
+from psycopg2.extras import execute_values
 
 # ===== CONFIG =====
 CITY = "Islamabad"
-TAGS = ["Arrival", "Departure"]
+SOURCE = "PAA"
 PAA_TEMPLATE = "https://paaconnectapi.paa.gov.pk/api/flights/{date}/{type}/" + CITY
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# DB from secrets
+# ===== DB CONFIG =====
 DB_HOST = os.environ.get("DB_HOST")
 DB_NAME = os.environ.get("DB_NAME")
 DB_USER = os.environ.get("DB_USER")
 DB_PASSWORD = os.environ.get("DB_PASSWORD")
 DB_PORT = int(os.environ.get("DB_PORT", 5432))
 
+# ===== UTILS =====
 def log(msg):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts}] {msg}", flush=True)
+    print(f"[{ts}] {msg}")
 
-def fetch_flights(date_str, flight_type):
-    url = PAA_TEMPLATE.format(date=date_str, type=flight_type)
-    log(f"Fetching {flight_type} flights for {date_str}")
+def fetch_flights(date_str, tag):
+    url = PAA_TEMPLATE.format(date=date_str, type=tag)
     try:
-        r = requests.get(url, timeout=20, verify=False)
-        r.raise_for_status()
-        data = r.json()
-        log(f"{len(data)} flights retrieved")
-        return data
+        r = requests.get(url, verify=False, timeout=20)
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, list):
+                log(f"{len(data)} flights retrieved for {tag} {date_str}")
+                return data
+        log(f"Fetch failed {url} code {r.status_code}")
     except Exception as e:
-        log(f"Error fetching flights: {e}")
-        return []
+        log(f"Error fetching {url}: {e}")
+    return []
 
-def flatten_flight(f, flight_type, date_str, fetched_at):
+def flatten_flight(f, tag, date_str, fetched_at):
     flight_number = f.get("FlightNumber")
     if not flight_number:
-        log(f"[WARNING] Missing FlightNumber, skipping: {f}")
+        log(f"[WARNING] Skipping flight with missing FlightNumber for {tag} {date_str}")
         return None
-
-    city = f.get("EnglishFromCity") if flight_type.lower() == "arrival" else f.get("EnglishToCity")
-
     return {
         "flight_number": flight_number,
         "scheduled_date": date_str,
-        "type": flight_type,
-        "city": city,
+        "type": tag,
+        "city": f.get("EnglishFromCity") if tag == "Arrival" else f.get("EnglishToCity"),
         "airline_logo": f.get("Logo"),
         "status": f.get("EnglishRemarks"),
         "ST": f.get("ST"),
@@ -57,6 +56,7 @@ def flatten_flight(f, flight_type, date_str, fetched_at):
         "last_updated": fetched_at
     }
 
+# ===== MAIN =====
 def main():
     try:
         conn = psycopg2.connect(
@@ -67,32 +67,37 @@ def main():
             port=DB_PORT,
             sslmode="require"
         )
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
         log("✅ DB connection successful!")
     except Exception as e:
         log(f"❌ DB connection failed: {e}")
-        return
+        raise
 
-    # PKT timezone adjustment
-    now = datetime.datetime.utcnow() + datetime.timedelta(hours=5)
+    cursor = conn.cursor()
+
+    now = datetime.datetime.now()
     dates = [
         (now + datetime.timedelta(days=-1)).strftime("%Y-%m-%d"),
         now.strftime("%Y-%m-%d"),
         (now + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
     ]
-    fetched_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    tags = ["Arrival", "Departure"]
 
     for date_str in dates:
-        for tag in TAGS:
+        for tag in tags:
+            fetched_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
             flights = fetch_flights(date_str, tag)
+            if not flights:
+                continue
+
             changed_count = 0
+            snapshot_rows = []
 
             for f in flights:
                 flat = flatten_flight(f, tag, date_str, fetched_at)
                 if not flat:
                     continue
 
-                # Upsert flights
+                # Upsert flights table
                 cursor.execute("""
                     INSERT INTO flights (
                         flight_number, scheduled_date, type, city, airline_logo, status, ST, ET, last_checked, last_updated
@@ -120,21 +125,38 @@ def main():
                 updated = cursor.fetchone()
                 if updated:
                     changed_count += 1
-                    # Append snapshot
-                    cursor.execute("""
-                        INSERT INTO flight_snapshots (
-                            flight_number, scheduled_date, scraped_at, is_changed, status, ST, ET, city, type, airline_logo
-                        ) VALUES (
-                            %(flight_number)s, %(scheduled_date)s, %(scraped_at)s, TRUE, %(status)s, %(ST)s, %(ET)s, %(city)s, %(type)s, %(airline_logo)s
-                        )
-                    """, {**flat, "scraped_at": fetched_at})
+                    # Collect for batch snapshot insert
+                    snapshot_rows.append({
+                        **flat,
+                        "scraped_at": fetched_at
+                    })
+
+            # Batch insert snapshots
+            if snapshot_rows:
+                execute_values(cursor, """
+                    INSERT INTO flight_snapshots (
+                        flight_number, scheduled_date, scraped_at, is_changed, status, ST, ET, city, type, airline_logo
+                    ) VALUES %s
+                """, [
+                    (
+                        r["flight_number"],
+                        r["scheduled_date"],
+                        r["scraped_at"],
+                        True,
+                        r["status"],
+                        r["ST"],
+                        r["ET"],
+                        r["city"],
+                        r["type"],
+                        r["airline_logo"]
+                    ) for r in snapshot_rows
+                ])
 
             log(f"{changed_count} flights changed for {tag} {date_str}")
+            conn.commit()
 
-    conn.commit()
     cursor.close()
     conn.close()
-    log("✅ Scraper run completed!")
 
 if __name__ == "__main__":
     main()
