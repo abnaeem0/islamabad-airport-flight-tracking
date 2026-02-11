@@ -1,52 +1,62 @@
+#!/usr/bin/env python3
+"""
+scraper.py
+Fetches PAA arrivals/departures for yesterday, today, tomorrow,
+upserts to flights table, inserts snapshots with is_changed flag.
+"""
+
 import os
+import datetime
+import requests
 import psycopg2
 from psycopg2.extras import execute_values
-from datetime import datetime, timedelta
 import pytz
-import requests
 
-# --- CONFIG ---
-PKT = pytz.timezone("Asia/Karachi")  # Pakistan Standard Time
+# ===== CONFIG =====
+CITY = "Islamabad"
+PKT = pytz.timezone("Asia/Karachi")
+PAA_TEMPLATE = "https://paaconnectapi.paa.gov.pk/api/flights/{date}/{type}/" + CITY
 
 DB_HOST = os.environ.get("DB_HOST")
 DB_NAME = os.environ.get("DB_NAME")
 DB_USER = os.environ.get("DB_USER")
 DB_PASSWORD = os.environ.get("DB_PASSWORD")
 DB_PORT = os.environ.get("DB_PORT", 5432)
-
-API_URL = "https://api.example.com/flights"  # replace with real PAA API
-# ----------------
+# ==================
 
 def get_dates():
-    today = datetime.now(PKT).date()
+    today = datetime.datetime.now(PKT).date()
     return [
-        today - timedelta(days=1),  # yesterday
-        today,                      # today
-        today + timedelta(days=1)   # tomorrow
+        today - datetime.timedelta(days=1),
+        today,
+        today + datetime.timedelta(days=1)
     ]
 
 def fetch_flights(date, flight_type):
-    """
-    Abstract fetcher. Replace parsing logic with real API fields.
-    """
-    # Example API call: ?date=YYYY-MM-DD&type=Arrival/Departure
-    resp = requests.get(f"{API_URL}?date={date}&type={flight_type}")
-    data = resp.json()
-    
-    flights = []
-    for f in data.get("flights", []):
-        flights.append({
-            "flight_number": f.get("flight_number"),
-            "scheduled_date": date,
-            "type": flight_type,
-            "city": f.get("city"),
-            "status": f.get("status"),
-            "ST": f.get("scheduled_time"),  # scheduled time
-            "ET": f.get("estimated_time"),  # estimated time
-            "remarks": f.get("remarks"),
-            "airline_logo": f.get("airline_logo"),
-        })
-    return flights
+    url = PAA_TEMPLATE.format(date=date, type=flight_type)
+    print(f"Fetching {flight_type} flights for {date}")
+    try:
+        r = requests.get(url, timeout=20)
+        r.raise_for_status()
+        data = r.json()
+        flights = []
+        for f in data if isinstance(data, list) else []:
+            flights.append({
+                "flight_number": f.get("flight_number"),
+                "scheduled_date": date,
+                "type": flight_type,
+                "city": f.get("city"),
+                "status": f.get("status"),
+                "ST": f.get("scheduled_time"),
+                "ET": f.get("estimated_time"),
+                "remarks": f.get("remarks"),
+                "airline_logo": f.get("airline_logo")
+            })
+        print(f"{len(flights)} flights retrieved")
+        return flights
+    except Exception as e:
+        print(f"Error fetching {url}: {e}")
+        return []
 
 def connect_db():
     return psycopg2.connect(
@@ -58,82 +68,81 @@ def connect_db():
     )
 
 def upsert_flights(conn, flights):
-    """
-    Upsert latest flight data into `flights` table.
-    Returns list of flights with 'changed' flag for snapshot insertion.
-    """
     changed_flights = []
+    now = datetime.datetime.now(PKT)
     with conn.cursor() as cur:
         for f in flights:
-            cur.execute("""
-                SELECT status, ST, ET, remarks, city, airline_logo
-                FROM flights
-                WHERE flight_number=%s AND scheduled_date=%s AND type=%s
-            """, (f["flight_number"], f["scheduled_date"], f["type"]))
-            existing = cur.fetchone()
-            
-            # Check if any field changed
-            is_changed = False
-            if existing:
-                existing_fields = dict(zip(["status", "ST", "ET", "remarks", "city", "airline_logo"], existing))
-                for key in ["status", "ST", "ET", "remarks", "city", "airline_logo"]:
-                    if f.get(key) != existing_fields.get(key):
-                        is_changed = True
-                        break
-            else:
-                is_changed = True  # new flight
-            
-            f["is_changed"] = is_changed
-            changed_flights.append(f)
-            
-            # Upsert flights table
-            cur.execute("""
-                INSERT INTO flights (flight_number, scheduled_date, type, city, status, ST, ET, remarks, airline_logo, last_checked, last_updated)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                ON CONFLICT (flight_number, scheduled_date, type)
-                DO UPDATE SET
-                    city = EXCLUDED.city,
-                    status = EXCLUDED.status,
-                    ST = EXCLUDED.ST,
-                    ET = EXCLUDED.ET,
-                    remarks = EXCLUDED.remarks,
-                    airline_logo = EXCLUDED.airline_logo,
-                    last_checked = EXCLUDED.last_checked,
-                    last_updated = CASE WHEN flights.status <> EXCLUDED.status 
-                                            OR flights.ST <> EXCLUDED.ST
-                                            OR flights.ET <> EXCLUDED.ET
-                                            OR flights.remarks <> EXCLUDED.remarks
-                                            OR flights.city <> EXCLUDED.city
-                                            OR flights.airline_logo <> EXCLUDED.airline_logo
-                                        THEN EXCLUDED.last_checked
-                                        ELSE flights.last_updated
-                                    END
-            """, (
-                f["flight_number"], f["scheduled_date"], f["type"], f["city"], f["status"],
-                f["ST"], f["ET"], f["remarks"], f["airline_logo"],
-                datetime.now(PKT), datetime.now(PKT)
-            ))
+            try:
+                cur.execute("""
+                    SELECT status, ST, ET, remarks, city, airline_logo
+                    FROM flights
+                    WHERE flight_number=%s AND scheduled_date=%s AND type=%s
+                """, (f["flight_number"], f["scheduled_date"], f["type"]))
+                existing = cur.fetchone()
+
+                is_changed = False
+                if existing:
+                    existing_fields = dict(zip(["status", "ST", "ET", "remarks", "city", "airline_logo"], existing))
+                    for key in ["status", "ST", "ET", "remarks", "city", "airline_logo"]:
+                        if f.get(key) != existing_fields.get(key):
+                            is_changed = True
+                            break
+                else:
+                    is_changed = True
+
+                f["is_changed"] = is_changed
+                changed_flights.append(f)
+
+                cur.execute("""
+                    INSERT INTO flights (flight_number, scheduled_date, type, city, status, ST, ET, remarks, airline_logo, last_checked, last_updated)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (flight_number, scheduled_date, type)
+                    DO UPDATE SET
+                        city = EXCLUDED.city,
+                        status = EXCLUDED.status,
+                        ST = EXCLUDED.ST,
+                        ET = EXCLUDED.ET,
+                        remarks = EXCLUDED.remarks,
+                        airline_logo = EXCLUDED.airline_logo,
+                        last_checked = EXCLUDED.last_checked,
+                        last_updated = CASE WHEN flights.status <> EXCLUDED.status 
+                                                OR flights.ST <> EXCLUDED.ST
+                                                OR flights.ET <> EXCLUDED.ET
+                                                OR flights.remarks <> EXCLUDED.remarks
+                                                OR flights.city <> EXCLUDED.city
+                                                OR flights.airline_logo <> EXCLUDED.airline_logo
+                                            THEN EXCLUDED.last_checked
+                                            ELSE flights.last_updated
+                                        END
+                """, (
+                    f["flight_number"], f["scheduled_date"], f["type"], f["city"], f["status"],
+                    f["ST"], f["ET"], f["remarks"], f["airline_logo"],
+                    now, now
+                ))
+            except Exception as e:
+                print(f"Error upserting flight {f.get('flight_number')}: {e}")
         conn.commit()
+    print(f"{sum(f['is_changed'] for f in changed_flights)} flights changed")
     return changed_flights
 
 def insert_snapshots(conn, flights):
-    """
-    Insert snapshot for each flight.
-    """
+    now = datetime.datetime.now(PKT)
     with conn.cursor() as cur:
         records = []
-        now = datetime.now(PKT)
         for f in flights:
             records.append((
                 f["flight_number"], f["scheduled_date"], now, f["is_changed"],
                 f["status"], f["ST"], f["ET"], f["remarks"], f["city"], f["airline_logo"]
             ))
-        execute_values(cur, """
-            INSERT INTO flight_snapshots
-            (flight_number, scheduled_date, scraped_at, is_changed, status, ST, ET, remarks, city, airline_logo)
-            VALUES %s
-        """, records)
-        conn.commit()
+        try:
+            execute_values(cur, """
+                INSERT INTO flight_snapshots
+                (flight_number, scheduled_date, scraped_at, is_changed, status, ST, ET, remarks, city, airline_logo)
+                VALUES %s
+            """, records)
+            conn.commit()
+        except Exception as e:
+            print(f"Error inserting snapshots: {e}")
 
 def main():
     dates = get_dates()
@@ -144,10 +153,14 @@ def main():
             flights = fetch_flights(date, flight_type)
             all_flights.extend(flights)
     
+    if not all_flights:
+        print("No flights fetched.")
+        return
+
     changed_flights = upsert_flights(conn, all_flights)
     insert_snapshots(conn, changed_flights)
     conn.close()
-    print(f"Processed {len(all_flights)} flights.")
+    print(f"Processed {len(all_flights)} flights total.")
 
 if __name__ == "__main__":
     main()
