@@ -7,6 +7,9 @@ DB_USER = os.environ.get("DB_USER")
 DB_PASSWORD = os.environ.get("DB_PASSWORD")
 DB_PORT = os.environ.get("DB_PORT", 5432)
 
+print("DB_HOST set?", bool(DB_HOST))
+print("DB_PORT set?", DB_PORT)
+
 try:
     conn = psycopg2.connect(
         host=DB_HOST,
