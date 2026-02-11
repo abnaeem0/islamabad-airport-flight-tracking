@@ -5,10 +5,7 @@ DB_HOST = os.environ.get("DB_HOST")
 DB_NAME = os.environ.get("DB_NAME")
 DB_USER = os.environ.get("DB_USER")
 DB_PASSWORD = os.environ.get("DB_PASSWORD")
-DB_PORT = os.environ.get("DB_PORT", 5432)
-
-print("DB_HOST set?", bool(DB_HOST))
-print("DB_PORT set?", DB_PORT)
+DB_PORT = int(os.environ.get("DB_PORT", 5432))
 
 try:
     conn = psycopg2.connect(
@@ -16,10 +13,11 @@ try:
         dbname=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD,
-        port=DB_PORT
+        port=DB_PORT,
+        sslmode="require"   # <- important for Supabase
     )
-    print("DB connection successful!")
+    print("✅ DB connection successful!", flush=True)
     conn.close()
 except Exception as e:
-    print(f"DB connection failed: {e}")
-    exit(1)
+    print(f"❌ DB connection failed: {e}", flush=True)
+    raise
