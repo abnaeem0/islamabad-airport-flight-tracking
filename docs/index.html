@@ -23,8 +23,16 @@
     <ul id="history-list"></ul>
   </div>
 
-  <!-- Supabase library -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.36.0/dist/supabase.min.js"></script>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.36.0/dist/module/supabase.js';
+
+    const supabaseUrl = 'https://sbaweaytsmdmhaclgcwr.supabase.co';
+    const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
+    const client = createClient(supabaseUrl, supabaseKey);
+
+    window.supabaseClient = client; // make it globally accessible
+  </script>
+  
   <!-- Your JS -->
   <script src="script.js"></script>
 </body>
