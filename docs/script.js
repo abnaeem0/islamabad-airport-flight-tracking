@@ -1,40 +1,44 @@
-// Supabase setup
+// Supabase client setup
 const supabaseUrl = 'https://sbaweaytsmdmhaclgcwr.supabase.co';
 const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
-const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+const client = supabase.createClient(supabaseUrl, supabaseKey);
 
 // DOM elements
 const searchBtn = document.getElementById('search-btn');
 const resultsDiv = document.getElementById('search-results');
 const historyList = document.getElementById('history-list');
 
+// Default date = today
 document.getElementById('flight-date').valueAsDate = new Date();
 
-// Search click handler
+// Event: search button click
 searchBtn.addEventListener('click', async () => {
   const query = document.getElementById('flight-search').value.trim();
   const date = document.getElementById('flight-date').value;
 
   if (!query) return alert('Enter a flight number');
 
-  // Fetch flights
-  const { data: flights, error: flightsError } = await supabase
+  // Fetch flights from flights table
+  const { data: flights, error } = await client
     .from('flights')
     .select('*')
     .ilike('flight_number', `%${query}%`)
     .eq('scheduled_date', date);
 
-  if (flightsError) return alert('Error fetching flights');
+  if (error) {
+    console.error(error);
+    return alert('Error fetching flights');
+  }
 
   if (!flights.length) {
     resultsDiv.innerHTML = '<p>No flights found.</p>';
     return;
   }
 
-  // Display results
+  // Render flights
   resultsDiv.innerHTML = flights.map(f => `
     <div class="flight-card">
-      <img src="${f.airline_logo}" alt="logo" width="40">
+      ${f.airline_logo ? `<img src="${f.airline_logo}" alt="logo" width="40">` : ''}
       <strong>${f.flight_number}</strong> | ${f.type} | ${f.city}<br>
       ST: ${f.ST} | ET: ${f.ET} | Status: ${f.status}<br>
       <button onclick="viewHistory('${f.flight_number}','${date}')">History</button>
@@ -44,7 +48,7 @@ searchBtn.addEventListener('click', async () => {
   saveToLocalHistory(query, date);
 });
 
-// Local history
+// -------- Local history ----------
 function saveToLocalHistory(flightNumber, date) {
   let history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
   history = history.filter(h => !(h.flightNumber === flightNumber && h.date === date));
@@ -56,7 +60,9 @@ function saveToLocalHistory(flightNumber, date) {
 
 function renderHistory() {
   const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
-  historyList.innerHTML = history.map(h => `<li onclick="loadFlight('${h.flightNumber}','${h.date}')">${h.flightNumber} | ${h.date}</li>`).join('');
+  historyList.innerHTML = history.map(h =>
+    `<li onclick="loadFlight('${h.flightNumber}','${h.date}')">${h.flightNumber} | ${h.date}</li>`
+  ).join('');
 }
 
 function loadFlight(flightNumber, date) {
@@ -65,20 +71,25 @@ function loadFlight(flightNumber, date) {
   searchBtn.click();
 }
 
-// Flight history (change timeline)
+// -------- Flight history ----------
 async function viewHistory(flightNumber, date) {
-  const { data: snapshots, error } = await supabase
+  const { data: snapshots, error } = await client
     .from('flight_snapshots')
     .select('last_checked, ST, ET, status')
     .eq('flight_number', flightNumber)
     .eq('scheduled_date', date)
     .order('last_checked', { ascending: true });
 
-  if (error || !snapshots.length) return alert('No history available');
+  if (error) {
+    console.error(error);
+    return alert('Error fetching history');
+  }
+
+  if (!snapshots.length) return alert('No history available');
 
   const timeline = snapshots.map(s => `${s.last_checked} → ST: ${s.ST} | ET: ${s.ET} | ${s.status}`).join('<br>');
-  alert(timeline); // simple MVP, replace with modal/table later
+  alert(timeline); // Simple MVP; can replace with table/modal later
 }
 
-// Render history on load
+// Initialize local history on load
 renderHistory();
