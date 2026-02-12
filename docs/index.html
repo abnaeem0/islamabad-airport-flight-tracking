@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Islamabad Flight Tracker</title>
-  <link rel="stylesheet" href="style.css">
   <meta name="description" content="Check Islamabad airport flights, track changes, and see flight history. Lightweight and simple.">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <h1>Islamabad Flight Tracker</h1>
 
   <div id="search-container">
     <input type="text" id="flight-search" placeholder="Enter flight number or airline">
-    <input type="date" id="flight-date" value="">
+    <input type="date" id="flight-date">
     <button id="search-btn">Search</button>
   </div>
 
@@ -22,7 +22,10 @@
     <h3>Recent Searches</h3>
     <ul id="history-list"></ul>
   </div>
+
+  <!-- Supabase library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.36.0/dist/supabase.min.js"></script>
+  <!-- Your JS -->
   <script src="script.js"></script>
 </body>
 </html>
