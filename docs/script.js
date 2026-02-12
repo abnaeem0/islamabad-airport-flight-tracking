@@ -1,7 +1,5 @@
-// Supabase client setup
-const supabaseUrl = 'https://sbaweaytsmdmhaclgcwr.supabase.co';
-const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
-const client = Supabase.createClient(supabaseUrl, supabaseKey);
+// Get Supabase client from window
+const client = window.supabaseClient;
 
 // DOM elements
 const searchBtn = document.getElementById('search-btn');
