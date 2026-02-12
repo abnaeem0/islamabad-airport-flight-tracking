@@ -1,5 +1,8 @@
-// Get Supabase client from window
-const client = window.supabaseClient;
+// Use the bundled Supabase object from CDN
+const supabaseUrl = 'https://sbaweaytsmdmhaclgcwr.supabase.co';
+const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
+const client = supabase.createClient(supabaseUrl, supabaseKey);
+
 
 // DOM elements
 const searchBtn = document.getElementById('search-btn');
