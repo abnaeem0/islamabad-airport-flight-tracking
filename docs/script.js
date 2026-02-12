@@ -1,40 +1,43 @@
-// Setup
-const supabaseUrl = 'https://YOUR_SUPABASE_URL.supabase.co';
-const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
-const { createClient } = supabase;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Supabase setup
+const supabaseUrl = 'https://sbaweaytsmdmhaclgcwr.supabase.co';
+const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
+const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+// DOM elements
+const searchBtn = document.getElementById('search-btn');
+const resultsDiv = document.getElementById('search-results');
+const historyList = document.getElementById('history-list');
 
 document.getElementById('flight-date').valueAsDate = new Date();
 
-const searchBtn = document.getElementById('search-btn');
-const resultsDiv = document.getElementById('search-results');
-
+// Search click handler
 searchBtn.addEventListener('click', async () => {
   const query = document.getElementById('flight-search').value.trim();
   const date = document.getElementById('flight-date').value;
 
   if (!query) return alert('Enter a flight number');
 
-  // Fetch flights from Supabase
-  const { data, error } = await supabase
+  // Fetch flights
+  const { data: flights, error: flightsError } = await supabase
     .from('flights')
     .select('*')
     .ilike('flight_number', `%${query}%`)
-    .eq('flight_date', date);
+    .eq('scheduled_date', date);
 
-  if (error) return alert('Error fetching flights');
+  if (flightsError) return alert('Error fetching flights');
 
-  if (!data.length) {
+  if (!flights.length) {
     resultsDiv.innerHTML = '<p>No flights found.</p>';
     return;
   }
 
   // Display results
-  resultsDiv.innerHTML = data.map(f => `
+  resultsDiv.innerHTML = flights.map(f => `
     <div class="flight-card">
-      <strong>${f.flight_number}</strong> ${f.from_airport} → ${f.to_airport}<br>
-      Scheduled: ${f.scheduled_time} | Estimated: ${f.estimated_time} | Status: ${f.status}
-      <button onclick="viewHistory('${f.flight_number}', '${date}')">History</button>
+      <img src="${f.airline_logo}" alt="logo" width="40">
+      <strong>${f.flight_number}</strong> | ${f.type} | ${f.city}<br>
+      ST: ${f.ST} | ET: ${f.ET} | Status: ${f.status}<br>
+      <button onclick="viewHistory('${f.flight_number}','${date}')">History</button>
     </div>
   `).join('');
 
@@ -53,8 +56,7 @@ function saveToLocalHistory(flightNumber, date) {
 
 function renderHistory() {
   const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
-  const list = document.getElementById('history-list');
-  list.innerHTML = history.map(h => `<li onclick="loadFlight('${h.flightNumber}','${h.date}')">${h.flightNumber} | ${h.date}</li>`).join('');
+  historyList.innerHTML = history.map(h => `<li onclick="loadFlight('${h.flightNumber}','${h.date}')">${h.flightNumber} | ${h.date}</li>`).join('');
 }
 
 function loadFlight(flightNumber, date) {
@@ -63,19 +65,19 @@ function loadFlight(flightNumber, date) {
   searchBtn.click();
 }
 
-// Flight history toggle
+// Flight history (change timeline)
 async function viewHistory(flightNumber, date) {
-  const { data } = await supabase
+  const { data: snapshots, error } = await supabase
     .from('flight_snapshots')
-    .select('updated_at, scheduled_time, status')
+    .select('last_checked, ST, ET, status')
     .eq('flight_number', flightNumber)
-    .eq('flight_date', date)
-    .order('updated_at', { ascending: true });
+    .eq('scheduled_date', date)
+    .order('last_checked', { ascending: true });
 
-  if (!data || !data.length) return alert('No history available');
+  if (error || !snapshots.length) return alert('No history available');
 
-  const historyHtml = data.map(h => `<div>${h.updated_at} → ${h.scheduled_time} | ${h.status}</div>`).join('');
-  alert(historyHtml); // simple MVP; can replace with modal
+  const timeline = snapshots.map(s => `${s.last_checked} → ST: ${s.ST} | ET: ${s.ET} | ${s.status}`).join('<br>');
+  alert(timeline); // simple MVP, replace with modal/table later
 }
 
 // Render history on load
