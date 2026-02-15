@@ -1,7 +1,7 @@
 // Use the bundled Supabase object from CDN
 const supabaseUrl = 'https://sbaweaytsmdmhaclgcwr.supabase.co';
 const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
-const client = Supabase.createClient(supabaseUrl, supabaseKey);
+const client = supabase.createClient(supabaseUrl, supabaseKey);
 
 
 // DOM elements
