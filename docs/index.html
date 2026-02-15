@@ -1,109 +1,37 @@
-document.addEventListener('DOMContentLoaded', () => {
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Islamabad Flight Tracker</title>
+  <meta name="description" content="Check Islamabad airport flights and history." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
 
-  // Ensure Supabase loaded
-  if (typeof supabase === 'undefined') {
-    console.error('Supabase failed to load.');
-    return;
-  }
+  <h1>Islamabad Flight Tracker</h1>
 
-  const supabaseUrl = 'https://sbaweaytsmdmhaclgcwr.supabase.co';
-  const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
-  const client = supabase.createClient(supabaseUrl, supabaseKey);
+  <div id="search-container">
+    <input type="text" id="flight-search" placeholder="Enter flight number or airline">
+    <input type="date" id="flight-date">
+    <button id="search-btn">Search</button>
+  </div>
 
-  // DOM elements
-  const searchBtn = document.getElementById('search-btn');
-  const resultsDiv = document.getElementById('search-results');
-  const historyList = document.getElementById('history-list');
-  const dateInput = document.getElementById('flight-date');
+  <div id="search-results"></div>
 
-  if (dateInput) dateInput.valueAsDate = new Date();
+  <div id="local-history">
+    <h3>Recent Searches</h3>
+    <ul id="history-list"></ul>
+  </div>
 
-  // Search click
-  searchBtn.addEventListener('click', async () => {
-    const query = document.getElementById('flight-search').value.trim();
-    const date = dateInput.value;
+  <!-- Load Supabase FIRST -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.36.0/dist/supabase.min.js"
+    defer>
+  </script>
 
-    if (!query) return alert('Enter a flight number');
+  <!-- Then your script -->
+  <script src="script.js" defer></script>
 
-    try {
-      const { data: flights, error } = await client
-        .from('flights')
-        .select('*')
-        .ilike('flight_number', `%${query}%`)
-        .eq('scheduled_date', date);
-
-      if (error) throw error;
-
-      if (!flights.length) {
-        resultsDiv.innerHTML = '<p>No flights found.</p>';
-        return;
-      }
-
-      resultsDiv.innerHTML = flights.map(f => `
-        <div class="flight-card">
-          ${f.airline_logo ? `<img src="${f.airline_logo}" width="40">` : ''}
-          <strong>${f.flight_number}</strong> | ${f.type} | ${f.city}<br>
-          ST: ${f.ST} | ET: ${f.ET} | Status: ${f.status}<br>
-          <button onclick="viewHistory('${f.flight_number}','${date}')">History</button>
-        </div>
-      `).join('');
-
-      saveToLocalHistory(query, date);
-
-    } catch (err) {
-      console.error(err);
-      alert('Error fetching flights');
-    }
-  });
-
-  // Local history
-  function saveToLocalHistory(flightNumber, date) {
-    let history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
-    history = history.filter(h => !(h.flightNumber === flightNumber && h.date === date));
-    history.unshift({ flightNumber, date });
-    if (history.length > 5) history.pop();
-    localStorage.setItem('flightHistory', JSON.stringify(history));
-    renderHistory();
-  }
-
-  function renderHistory() {
-    const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
-    historyList.innerHTML = history.map(h =>
-      `<li onclick="loadFlight('${h.flightNumber}','${h.date}')">${h.flightNumber} | ${h.date}</li>`
-    ).join('');
-  }
-
-  window.loadFlight = function(flightNumber, date) {
-    document.getElementById('flight-search').value = flightNumber;
-    dateInput.value = date;
-    searchBtn.click();
-  };
-
-  // Make history global
-  window.viewHistory = async function(flightNumber, date) {
-    try {
-      const { data: snapshots, error } = await client
-        .from('flight_snapshots')
-        .select('last_checked, ST, ET, status')
-        .eq('flight_number', flightNumber)
-        .eq('scheduled_date', date)
-        .order('last_checked', { ascending: true });
-
-      if (error) throw error;
-      if (!snapshots.length) return alert('No history available');
-
-      const timeline = snapshots
-        .map(s => `${s.last_checked} → ST: ${s.ST} | ET: ${s.ET} | ${s.status}`)
-        .join('<br>');
-
-      alert(timeline);
-
-    } catch (err) {
-      console.error(err);
-      alert('Error fetching history');
-    }
-  };
-
-  renderHistory();
-
-});
+</body>
+</html>
