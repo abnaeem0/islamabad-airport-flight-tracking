@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="flight-card">
           ${f.airline_logo ? `<img src="${f.airline_logo}" width="40">` : ''}
           <strong>${f.flight_number}</strong> | ${f.type} | ${f.city}<br>
-          ST: ${f.ST} | ET: ${f.ET} | Status: ${f.status}<br>
+          ST: ${f.st} | ET: ${f.et} | Status: ${f.status}<br>
           <button onclick="viewHistory('${f.flight_number}','${date}')">History</button>
         </div>
       `).join('');
