@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const { data: snapshots, error } = await client
         .from('flight_snapshots')
-        .select('last_checked, ST, ET, status')
+        .select('last_checked, st, et, status')
         .eq('flight_number', flightNumber)
         .eq('scheduled_date', date)
         .order('last_checked', { ascending: true });
@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!snapshots.length) return alert('No history available');
 
       const timeline = snapshots
-        .map(s => `${s.last_checked} → ST: ${s.ST} | ET: ${s.ET} | ${s.status}`)
+        .map(s => `${s.last_checked} → ST: ${s.st} | ET: ${s.et} | ${s.status}`)
         .join('<br>');
 
       alert(timeline);
