@@ -72,7 +72,8 @@ def main():
         log(f"❌ DB connection failed: {e}")
         raise
 
-    cursor = conn.cursor()
+    from psycopg2.extras import RealDictCursor
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     now = datetime.datetime.now()
     dates = [
@@ -125,8 +126,13 @@ def main():
                 updated = cursor.fetchone()
                 if updated:
                     # Compare relevant fields
-                    fields_to_check = ["status", "st", "et", "city", "type"]
-                    is_changed = any(flat.get(f) != updated[i+1] for i, f in enumerate(fields_to_check))
+                    is_changed = (
+                        flat["status"] != updated["status"] or
+                        flat["ST"] != updated["ST"] or
+                        flat["ET"] != updated["ET"] or
+                        flat["city"] != updated["city"]
+                    )
+
                     if is_changed:
                         changed_count += 1
                     snapshot_rows.append({
