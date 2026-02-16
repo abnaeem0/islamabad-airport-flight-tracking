@@ -8,12 +8,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const client = supabase.createClient(supabaseUrl, supabaseKey);
 
   function formatPKT(dateStr) {
-    return new Date(dateStr).toLocaleString('en-GB', {
+    // Treat DB string as UTC
+    const utcDate = new Date(dateStr + 'Z'); 
+    return utcDate.toLocaleString('en-GB', {
       timeZone: 'Asia/Karachi',
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit'
-    });
-  }
+      });
+  }  
 
   
   try {
