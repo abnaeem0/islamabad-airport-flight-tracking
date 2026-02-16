@@ -124,11 +124,13 @@ def main():
 
                 updated = cursor.fetchone()
                 if updated:
-                    changed_count += 1
-                    # Collect for batch snapshot insert
+                    # Compare relevant fields
+                    fields_to_check = ["status", "ST", "ET", "city", "type"]
+                    is_changed = any(flat.get(f) != updated[i+1] for i, f in enumerate(fields_to_check))
                     snapshot_rows.append({
                         **flat,
-                        "scraped_at": fetched_at
+                        "scraped_at": fetched_at,
+                        "is_changed": is_changed
                     })
 
             # Batch insert snapshots
@@ -142,7 +144,7 @@ def main():
                         r["flight_number"],
                         r["scheduled_date"],
                         r["scraped_at"],
-                        True,
+                        r["is_changed"],
                         r["status"],
                         r["ST"],
                         r["ET"],
