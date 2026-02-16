@@ -89,5 +89,5 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
  window.viewHistory = function(flightNumber, date) {
-  window.location.href = `flight_detail.html?flight=${flightNumber}&date=${date}`;
-};
+    window.location.href = `flight_detail.html?flight=${flightNumber}&date=${date}`;
+  };
