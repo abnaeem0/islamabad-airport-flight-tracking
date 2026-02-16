@@ -56,6 +56,19 @@ def flatten_flight(f, tag, date_str, fetched_at):
         "last_updated": f.get("DateUpdated")
     }
 
+def has_flight_changed(existing, flat):
+    """Return True when API data differs from the current flights table row."""
+    if existing is None:
+        return True
+
+    return any([
+        existing["city"] != flat["city"],
+        existing["airline_logo"] != flat["airline_logo"],
+        existing["status"] != flat["status"],
+        existing["st"] != flat["ST"],
+        existing["et"] != flat["ET"],
+    ])
+
 # ===== MAIN =====
 def main():
     try:
@@ -107,14 +120,9 @@ def main():
                 """, flat)
                 existing = cursor.fetchone()
 
-                is_changed = (
-                    existing is None or
-                    existing["city"] != flat["city"] or
-                    existing["airline_logo"] != flat["airline_logo"] or
-                    existing["status"] != flat["status"] or
-                    existing["st"] != flat["ST"] or
-                    existing["et"] != flat["ET"]
-                )
+                # Every API flight is snapshoted. Snapshot is marked changed only
+                # when it differs from the corresponding flights table row.
+                is_changed = has_flight_changed(existing, flat)
 
                 # Upsert flights table after change detection.
                 # Only API-sourced flight fields are updated on conflict.
