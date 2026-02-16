@@ -31,7 +31,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('flight-info').textContent = 'No history available';
       return;
     }
-
+    // Populate top flight info from the first snapshot
+    const first = snapshots[0];
+    document.getElementById('flight-number').textContent = `Flight: ${first.flight_number}`;
+    document.getElementById('flight-type').textContent = `Type: ${first.type}`;
+    document.getElementById('flight-city').textContent =
+      first.type === 'Arrival' ? `From: ${first.city}` : `To: ${first.city}`;
+    
     const tbody = document.querySelector('#snapshot-table tbody');
     snapshots.forEach(s => {
       const tr = document.createElement('tr');
