@@ -88,31 +88,6 @@ document.addEventListener('DOMContentLoaded', () => {
     searchBtn.click();
   };
 
-  // Make history global
-  window.viewHistory = async function(flightNumber, date) {
-    try {
-      const { data: snapshots, error } = await client
-        .from('flight_snapshots')
-        .select('scraped_at, st, et, status')
-        .eq('flight_number', flightNumber)
-        .eq('scheduled_date', date)
-        .order('scraped_at', { ascending: true });
-
-      if (error) throw error;
-      if (!snapshots.length) return alert('No history available');
-
-      const timeline = snapshots
-        .map(s => `${s.scraped_at} → ST: ${s.st} | ET: ${s.et} | ${s.status}`)
-        .join('<br>');
-
-      alert(timeline);
-
-    } catch (err) {
-      console.error(err);
-      alert('Error fetching history');
-    }
-  };
-
-  renderHistory();
-
-});
+ window.viewHistory = function(flightNumber, date) {
+  window.location.href = `flight_detail.html?flight=${flightNumber}&date=${date}`;
+};
