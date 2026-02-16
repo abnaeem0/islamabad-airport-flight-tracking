@@ -7,11 +7,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
   const client = supabase.createClient(supabaseUrl, supabaseKey);
 
-  const pktTime = new Date(s.scraped_at).toLocaleString('en-GB', {
-  timeZone: 'Asia/Karachi',
-  year: 'numeric', month: '2-digit', day: '2-digit',
-  hour: '2-digit', minute: '2-digit'
-  });
+  function formatPKT(dateStr) {
+    return new Date(dateStr).toLocaleString('en-GB', {
+      timeZone: 'Asia/Karachi',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
 
   
   try {
