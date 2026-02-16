@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Populate top flight info from the first snapshot
     const first = snapshots[0];
     document.getElementById('flight-number').textContent = `Flight: ${first.flight_number}`;
+    document.getElementById('flight-date').textContent = `Date: ${first.scheduled_date || date}`;
     document.getElementById('flight-type').textContent = `Type: ${first.type}`;
     document.getElementById('flight-city').textContent =
       first.type === 'Arrival' ? `From: ${first.city}` : `To: ${first.city}`;
