@@ -98,7 +98,26 @@ def main():
                 if not flat:
                     continue
 
-                # Upsert flights table
+                cursor.execute("""
+                    SELECT city, airline_logo, status, ST, ET
+                    FROM flights
+                    WHERE flight_number = %(flight_number)s
+                      AND scheduled_date = %(scheduled_date)s
+                      AND type = %(type)s
+                """, flat)
+                existing = cursor.fetchone()
+
+                is_changed = (
+                    existing is None or
+                    existing["city"] != flat["city"] or
+                    existing["airline_logo"] != flat["airline_logo"] or
+                    existing["status"] != flat["status"] or
+                    existing["st"] != flat["ST"] or
+                    existing["et"] != flat["ET"]
+                )
+
+                # Upsert flights table after change detection.
+                # Only API-sourced flight fields are updated on conflict.
                 cursor.execute("""
                     INSERT INTO flights (
                         flight_number, scheduled_date, type, city, airline_logo, status, ST, ET, last_checked, last_updated
@@ -112,34 +131,26 @@ def main():
                         status = EXCLUDED.status,
                         ST = EXCLUDED.ST,
                         ET = EXCLUDED.ET,
-                        last_checked = EXCLUDED.last_checked,
                         last_updated = CASE
                             WHEN flights.status IS DISTINCT FROM EXCLUDED.status
                                  OR flights.ST IS DISTINCT FROM EXCLUDED.ST
                                  OR flights.ET IS DISTINCT FROM EXCLUDED.ET
+                                 OR flights.city IS DISTINCT FROM EXCLUDED.city
+                                 OR flights.airline_logo IS DISTINCT FROM EXCLUDED.airline_logo
                             THEN EXCLUDED.last_updated
                             ELSE flights.last_updated
-                        END
-                    RETURNING *;
+                        END;
                 """, flat)
 
-                updated = cursor.fetchone()
-                if updated:
-                    # Compare relevant fields
-                    is_changed = (
-                        flat["status"] != updated["status"] or
-                        flat["ST"] != updated["st"] or
-                        flat["ET"] != updated["et"] or
-                        flat["city"] != updated["city"]
-                    )
+                if is_changed:
+                    changed_count += 1
 
-                    if is_changed:
-                        changed_count += 1
-                    snapshot_rows.append({
-                        **flat,
-                        "scraped_at": fetched_at,
-                        "is_changed": is_changed
-                    })
+                # Snapshot rows are uploaded in batch with mixed is_changed true/false values.
+                snapshot_rows.append({
+                    **flat,
+                    "scraped_at": fetched_at,
+                    "is_changed": is_changed
+                })
 
             # Batch insert snapshots
             if snapshot_rows:
