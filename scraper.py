@@ -128,8 +128,8 @@ def main():
                     # Compare relevant fields
                     is_changed = (
                         flat["status"] != updated["status"] or
-                        flat["ST"] != updated["ST"] or
-                        flat["ET"] != updated["ET"] or
+                        flat["ST"] != updated["st"] or
+                        flat["ET"] != updated["et"] or
                         flat["city"] != updated["city"]
                     )
 
