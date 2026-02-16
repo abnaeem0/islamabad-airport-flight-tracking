@@ -25,10 +25,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     snapshots.forEach(s => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${s.scraped_at}</td>
-        <td>${s.ST}</td>
-        <td>${s.ET}</td>
+        <td>${new Date(s.scraped_at).toLocaleString([], {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'})}</td>
+        <td>${s.st || s.ST}</td>
+        <td>${s.et || s.ET}</td>
         <td>${s.status}</td>
+        <td>${s.flight_number}</td>
+        <td>${s.type}</td>
+        <td>${s.city}</td>
       `;
       tbody.appendChild(tr);
     });
