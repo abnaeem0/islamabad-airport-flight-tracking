@@ -53,7 +53,7 @@ def flatten_flight(f, tag, date_str, fetched_at):
         "ST": f.get("ST"),
         "ET": f.get("ET"),
         "last_checked": fetched_at,
-        "last_updated": fetched_at
+        "last_updated": f.get("DateUpdated")
     }
 
 # ===== MAIN =====
