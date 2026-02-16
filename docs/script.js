@@ -23,7 +23,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const query = document.getElementById('flight-search').value.trim();
     const date = dateInput.value;
 
-    if (!query) return alert('Enter a flight number');
+    if (!query) {
+  // Fetch all flights for the date
+  const { data: flights, error } = await client
+    .from('flights')
+    .select('*')
+    .eq('scheduled_date', date);
+} else {
+  // Existing filtered fetch
+}
+
 
     try {
       const { data: flights, error } = await client
