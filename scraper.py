@@ -125,7 +125,7 @@ def main():
                 updated = cursor.fetchone()
                 if updated:
                     # Compare relevant fields
-                    fields_to_check = ["status", "ST", "ET", "city", "type"]
+                    fields_to_check = ["status", "st", "et", "city", "type"]
                     is_changed = any(flat.get(f) != updated[i+1] for i, f in enumerate(fields_to_check))
                     if is_changed:
                         changed_count += 1
