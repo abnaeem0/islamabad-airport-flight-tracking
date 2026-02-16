@@ -7,6 +7,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
   const client = supabase.createClient(supabaseUrl, supabaseKey);
 
+  const pktTime = new Date(s.scraped_at).toLocaleString('en-GB', {
+  timeZone: 'Asia/Karachi',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit'
+  });
+
+  
   try {
     const { data: snapshots, error } = await client
       .from('flight_snapshots')
@@ -25,7 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     snapshots.forEach(s => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${new Date(s.scraped_at).toLocaleString([], {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'})}</td>
+        <td>${formatPKT(s.scraped_at)}</td>
         <td>${s.st || s.ST}</td>
         <td>${s.et || s.ET}</td>
         <td>${s.status}</td>
