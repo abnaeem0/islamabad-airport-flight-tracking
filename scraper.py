@@ -127,6 +127,8 @@ def main():
                     # Compare relevant fields
                     fields_to_check = ["status", "ST", "ET", "city", "type"]
                     is_changed = any(flat.get(f) != updated[i+1] for i, f in enumerate(fields_to_check))
+                    if is_changed:
+                        changed_count += 1
                     snapshot_rows.append({
                         **flat,
                         "scraped_at": fetched_at,
