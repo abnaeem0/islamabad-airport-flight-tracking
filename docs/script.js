@@ -48,6 +48,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      flights.sort((a, b) => {
+        const timeToMinutes = t => {
+          const [h, m] = t.split(':').map(Number);
+          return h * 60 + m;
+        };
+        return timeToMinutes(a.st) - timeToMinutes(b.st);
+      });
+
+
       resultsDiv.innerHTML = flights.map(f => `
         <div class="flight-card">
           ${f.airline_logo ? `<img src="${f.airline_logo}" width="40">` : ''}
