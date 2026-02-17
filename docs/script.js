@@ -18,36 +18,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (dateInput) dateInput.valueAsDate = new Date();
 
-  // Search click
   searchBtn.addEventListener('click', async () => {
     const query = document.getElementById('flight-search').value.trim();
     const date = dateInput.value;
-
-    if (!query) {
-  // Fetch all flights for the date
-  const { data: flights, error } = await client
-    .from('flights')
-    .select('*')
-    .eq('scheduled_date', date);
-} else {
-  // Existing filtered fetch
-}
-
+    const typeFilter = document.getElementById('flight-type').value;
+    const cityFilter = document.getElementById('city-filter').value;
 
     try {
-      const { data: flights, error } = await client
-        .from('flights')
-        .select('*')
-        .ilike('flight_number', `%${query}%`)
-        .eq('scheduled_date', date);
-
+      // Base query
+      let queryBuilder = client.from('flights').select('*').eq('scheduled_date', date);
+  
+      if (query) queryBuilder = queryBuilder.ilike('flight_number', `%${query}%`);
+      if (typeFilter) queryBuilder = queryBuilder.eq('type', typeFilter);
+      // City filter applied after type check (optional)
+      if (cityFilter) queryBuilder = queryBuilder.ilike('city', `%${cityFilter}%`);
+  
+      const { data: flights, error } = await queryBuilder;
       if (error) throw error;
-
+  
       if (!flights.length) {
         resultsDiv.innerHTML = '<p>No flights found.</p>';
         return;
       }
-
+  
+      // Sort by scheduled time
       flights.sort((a, b) => {
         const timeToMinutes = t => {
           const [h, m] = t.split(':').map(Number);
@@ -55,8 +49,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         return timeToMinutes(a.st) - timeToMinutes(b.st);
       });
-
-
+  
+      // Populate city filter dynamically
+      const citySelect = document.getElementById('city-filter');
+      const cities = [...new Set(flights.map(f => f.city))].sort();
+      citySelect.innerHTML = '<option value="">All Cities</option>' + cities.map(c => `<option value="${c}">${c}</option>`).join('');
+  
+      // Render results
       resultsDiv.innerHTML = flights.map(f => `
         <div class="flight-card">
           ${f.airline_logo ? `<img src="${f.airline_logo}" width="40">` : ''}
@@ -65,9 +64,9 @@ document.addEventListener('DOMContentLoaded', () => {
           <button onclick="viewHistory('${f.flight_number}','${date}')">History</button>
         </div>
       `).join('');
-
+  
       saveToLocalHistory(query, date);
-
+  
     } catch (err) {
       console.error(err);
       alert('Error fetching flights');
