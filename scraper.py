@@ -163,30 +163,30 @@ def main():
 
             # Batch insert snapshots
             # Batch insert snapshots
-if snapshot_rows:
-    try:
-        execute_values(cursor, """
-            INSERT INTO flight_snapshots (
-                flight_number, scheduled_date, scraped_at, is_changed, status, ST, ET, city, type, airline_logo
-            ) VALUES %s
-        """, [
-            (
-                r["flight_number"],
-                r["scheduled_date"],
-                r["scraped_at"],
-                r["is_changed"],
-                r["status"],
-                r["ST"],
-                r["ET"],
-                r["city"],
-                r["type"],
-                r["airline_logo"]
-            ) for r in snapshot_rows
-        ])
-    except Exception as e:
-        log(f"SNAPSHOT INSERT FAILED: {e}")
-        conn.rollback()
-        raise
+            if snapshot_rows:
+                try:
+                    execute_values(cursor, """
+                        INSERT INTO flight_snapshots (
+                            flight_number, scheduled_date, scraped_at, is_changed, status, ST, ET, city, type, airline_logo
+                        ) VALUES %s
+                    """, [
+                        (
+                            r["flight_number"],
+                            r["scheduled_date"],
+                            r["scraped_at"],
+                            r["is_changed"],
+                            r["status"],
+                            r["ST"],
+                            r["ET"],
+                            r["city"],
+                            r["type"],
+                            r["airline_logo"]
+                        ) for r in snapshot_rows
+                    ])
+                except Exception as e:
+                    log(f"SNAPSHOT INSERT FAILED: {e}")
+                    conn.rollback()
+                    raise
 
 
             log(f"{changed_count} flights changed for {tag} {date_str}")
