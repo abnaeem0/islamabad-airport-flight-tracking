@@ -188,7 +188,6 @@ def main():
                     conn.rollback()
                     raise
 
-
             log(f"{changed_count} flights changed for {tag} {date_str}")
             conn.commit()
 
