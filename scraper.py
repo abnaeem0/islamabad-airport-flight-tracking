@@ -23,7 +23,8 @@ DB_PORT = int(os.environ.get("DB_PORT", 5432))
 def log(msg):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{ts}] {msg}")
-
+    
+# function to fetch flights from paa api
 def fetch_flights(date_str, tag):
     url = PAA_TEMPLATE.format(date=date_str, type=tag)
     try:
@@ -161,25 +162,32 @@ def main():
                 })
 
             # Batch insert snapshots
-            if snapshot_rows:
-                execute_values(cursor, """
-                    INSERT INTO flight_snapshots (
-                        flight_number, scheduled_date, scraped_at, is_changed, status, ST, ET, city, type, airline_logo
-                    ) VALUES %s
-                """, [
-                    (
-                        r["flight_number"],
-                        r["scheduled_date"],
-                        r["scraped_at"],
-                        r["is_changed"],
-                        r["status"],
-                        r["ST"],
-                        r["ET"],
-                        r["city"],
-                        r["type"],
-                        r["airline_logo"]
-                    ) for r in snapshot_rows
-                ])
+            # Batch insert snapshots
+if snapshot_rows:
+    try:
+        execute_values(cursor, """
+            INSERT INTO flight_snapshots (
+                flight_number, scheduled_date, scraped_at, is_changed, status, ST, ET, city, type, airline_logo
+            ) VALUES %s
+        """, [
+            (
+                r["flight_number"],
+                r["scheduled_date"],
+                r["scraped_at"],
+                r["is_changed"],
+                r["status"],
+                r["ST"],
+                r["ET"],
+                r["city"],
+                r["type"],
+                r["airline_logo"]
+            ) for r in snapshot_rows
+        ])
+    except Exception as e:
+        log(f"SNAPSHOT INSERT FAILED: {e}")
+        conn.rollback()
+        raise
+
 
             log(f"{changed_count} flights changed for {tag} {date_str}")
             conn.commit()
