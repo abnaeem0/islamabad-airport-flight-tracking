@@ -29,13 +29,15 @@
     <!-- Will populate dynamically from available flights -->
   </select>
 
-
+  <a href="#local-history" id="jump-to-history">View Recent Searches ↓</a>
   
   <div id="search-results"></div>
 
   <div id="local-history">
     <h3>Recent Searches</h3>
-    <ul id="history-list"></ul>
+    <ul id="history-list">
+        <!-- JS will populate this with <li> elements containing up/down buttons -->  
+    </ul>
   </div>
 
   <!-- Load Supabase FIRST -->
