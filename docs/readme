@@ -1,0 +1,7 @@
+flights are stored with spaces so need to keep that in mind when searching
+
+database improvements
+  save flight num without spaces
+  save all data from the api
+    were missing international/departure for filtering
+  consistent naming between tables
