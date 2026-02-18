@@ -16,7 +16,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       hour: '2-digit', minute: '2-digit'
       });
   }  
-
+  // ✅ Get references for the "Show all snapshots" checkbox and table body
+  
+  const toggleAllCheckbox = document.getElementById('toggle-all');
+  const tbody = document.querySelector('#snapshot-table tbody');
+  
   // ✅ Function to render snapshots
   // Only shows rows where ST, ET, or status changed unless checkbox is checked
   function renderSnapshots(snapshots) {
@@ -67,10 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('flight-city').textContent =
       first.type === 'Arrival' ? `From: ${first.city}` : `To: ${first.city}`;
 
-    // ✅ Get references for the "Show all snapshots" checkbox and table body
-    const toggleAllCheckbox = document.getElementById('toggle-all');
     
-    const tbody = document.querySelector('#snapshot-table tbody');
     // ✅ Render snapshots using change detection function
     renderSnapshots(snapshots);
     
