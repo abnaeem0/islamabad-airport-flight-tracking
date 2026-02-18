@@ -85,10 +85,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderHistory() {
     const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
-    historyList.innerHTML = history.map(h =>
-      `<li onclick="loadFlight('${h.flightNumber}','${h.date}')">${h.flightNumber} | ${h.date}</li>`
-    ).join('');
+    historyList.innerHTML = '';
+  
+    history.forEach((h, index) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span onclick="loadFlight('${h.flightNumber}','${h.date}')">${h.flightNumber} | ${h.date}</span>
+        <div class="history-buttons">
+          <button class="move-up" data-index="${index}">↑</button>
+          <button class="move-down" data-index="${index}">↓</button>
+        </div>
+      `;
+      historyList.appendChild(li);
+    });
+  
+    // Add button functionality
+    document.querySelectorAll('.move-up').forEach(btn => {
+      btn.onclick = () => moveHistory(parseInt(btn.dataset.index), -1);
+    });
+    document.querySelectorAll('.move-down').forEach(btn => {
+      btn.onclick = () => moveHistory(parseInt(btn.dataset.index), 1);
+    });
   }
+
+  function moveHistory(index, direction) {
+    const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= history.length) return; // bounds check
+  
+    // Swap items
+    [history[index], history[newIndex]] = [history[newIndex], history[index]];
+  
+    // Save and re-render
+    localStorage.setItem('flightHistory', JSON.stringify(history));
+    renderHistory();
+  }
+
+
 
   window.loadFlight = function(flightNumber, date) {
     document.getElementById('flight-search').value = flightNumber;
