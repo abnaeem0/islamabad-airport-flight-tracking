@@ -17,6 +17,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
   }  
 
+  // ✅ Function to render snapshots
+  // Only shows rows where ST, ET, or status changed unless checkbox is checked
+  function renderSnapshots(snapshots) {
+    tbody.innerHTML = ''; // clear table first
+    let prev = null; // keep track of last row shown
+    snapshots.forEach(s => {
+      const st = s.st || s.ST;
+      const et = s.et || s.ET;
+      const status = s.status;
+  
+      // Show this row if checkbox checked (show all) or values changed
+      const showRow = toggleAllCheckbox.checked || !prev || st !== prev.st || et !== prev.et || status !== prev.status;
+  
+      if (showRow) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${formatPKT(s.scraped_at)}</td>
+          <td>${st}</td>
+          <td>${et}</td>
+          <td>${status}</td>
+        `;
+        tbody.appendChild(tr);
+        prev = { st, et, status }; // update previous row
+      }
+    });
+  }
+
+
   
   try {
     const { data: snapshots, error } = await client
@@ -38,21 +66,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('flight-type').textContent = `Type: ${first.type}`;
     document.getElementById('flight-city').textContent =
       first.type === 'Arrival' ? `From: ${first.city}` : `To: ${first.city}`;
+
+    // ✅ Get references for the "Show all snapshots" checkbox and table body
+    const toggleAllCheckbox = document.getElementById('toggle-all');
     
     const tbody = document.querySelector('#snapshot-table tbody');
-    snapshots.forEach(s => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${formatPKT(s.scraped_at)}</td>
-        <td>${s.st || s.ST}</td>
-        <td>${s.et || s.ET}</td>
-        <td>${s.status}</td>
-        <td>${s.flight_number}</td>
-        <td>${s.type}</td>
-        <td>${s.city}</td>
-      `;
-      tbody.appendChild(tr);
-    });
+    // ✅ Render snapshots using change detection function
+    renderSnapshots(snapshots);
+    
+    // ✅ Re-render table when checkbox is toggled
+    toggleAllCheckbox.addEventListener('change', () => renderSnapshots(snapshots));
+
 
   } catch (err) {
     console.error(err);
