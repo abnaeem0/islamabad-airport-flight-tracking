@@ -5,3 +5,4 @@ database improvements
   save all data from the api
     were missing international/departure for filtering
   consistent naming between tables
+  scraped at time is in utc and updated time in the api is pkt so need to make all same
