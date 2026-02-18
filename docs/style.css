@@ -1,1 +1,70 @@
+/* Basic Reset & Body */
+body {
+  font-family: Arial, sans-serif;
+  line-height: 1.5;
+  margin: 0;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  color: #333;
+}
+
+/* Headings */
+h1 {
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+/* Flight Info Box */
+#flight-info {
+  background-color: #fff;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#flight-info p {
+  margin: 0.3rem 0;
+}
+
+/* Snapshot Controls */
+#snapshot-controls {
+  margin-bottom: 0.5rem;
+}
+
+/* Table */
+#snapshot-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 2rem;
+}
+
+#snapshot-table th,
+#snapshot-table td {
+  border: 1px solid #ddd;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+#snapshot-table th {
+  background-color: #f0f0f0;
+}
+
+/* Make table scrollable on mobile */
+@media (max-width: 600px) {
+  #snapshot-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Checkbox label spacing */
+#snapshot-controls label {
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
 
