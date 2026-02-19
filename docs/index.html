@@ -14,6 +14,16 @@
   <div id="search-container">
     <input type="text" id="flight-search" placeholder="Enter flight number or airline">
     <input type="date" id="flight-date">
+    <select id="flight-type">
+      <option value="">All</option>
+      <option value="Arrival">Arrival</option>
+      <option value="Departure">Departure</option>
+    </select>
+    
+    <select id="city-filter">
+      <option value="">All Cities</option>
+      <!-- Will populate dynamically from available flights -->
+    </select>
     <button id="search-btn">Search</button>
   </div>
 
@@ -35,15 +45,16 @@
 
   <div id="local-history">
     <h3>Recent Searches</h3>
+    <button id="clear-history-btn">Clear History</button>
+
     <ul id="history-list">
         <!-- JS will populate this with <li> elements containing up/down buttons -->  
     </ul>
   </div>
 
   <!-- Load Supabase FIRST -->
-  <script
-    <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  </script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
+  
 
   <!-- Then your script -->
   <script src="script.js" defer></script>
