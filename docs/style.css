@@ -193,3 +193,66 @@ h1 {
 html {
   scroll-behavior: smooth;
 }
+
+/* =========================
+   Header
+========================= */
+
+.site-header {
+  background-color: #222;
+  color: #fff;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.nav-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.site-header a {
+  color: #fff;
+  text-decoration: none;
+  margin-left: 1rem;
+  font-size: 0.95rem;
+}
+
+.site-header a:hover {
+  text-decoration: underline;
+}
+
+.logo {
+  font-weight: bold;
+  font-size: 1rem;
+  margin-left: 0;
+}
+
+/* =========================
+   Footer
+========================= */
+
+.site-footer {
+  background-color: #222;
+  color: #fff;
+  padding: 1rem;
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.site-footer nav {
+  margin-top: 0.5rem;
+}
+
+.site-footer a {
+  color: #fff;
+  text-decoration: none;
+  margin: 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
+}
+
