@@ -41,8 +41,6 @@ body {
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
-
-  /* Subtle grid texture */
   background-image:
     linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
@@ -126,7 +124,6 @@ h1 {
   background-clip: text;
 }
 
-/* SEO content block */
 .seo-content {
   max-width: 640px;
   margin: 0.5rem auto 1.5rem;
@@ -321,8 +318,7 @@ p.error {
   letter-spacing: 0.05em;
 }
 
-/* Flight info text — the <br> lines */
-.flight-card br + * ,
+.flight-card br + *,
 .flight-card {
   font-size: 0.88rem;
   color: var(--text-muted);
@@ -459,6 +455,98 @@ p.error {
 }
 
 /* =========================
+   History Label Editing
+========================= */
+
+.history-label-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.history-flight {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-flight:hover {
+  color: var(--accent);
+}
+
+.history-user-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.history-user-label:hover {
+  color: var(--accent);
+}
+
+.history-label-input {
+  font-family: 'Sora', sans-serif;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.4rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  outline: none;
+  width: 140px;
+}
+
+.history-delete {
+  color: #f87171 !important;
+  border-color: rgba(248,113,113,0.3) !important;
+}
+
+.history-delete:hover {
+  background: rgba(248,113,113,0.1) !important;
+  border-color: #f87171 !important;
+}
+
+.history-empty {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+  list-style: none;
+}
+
+/* =========================
+   Floating Nav Button
+========================= */
+
+#float-nav-btn {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 200;
+  padding: 0.55rem 1.1rem;
+  font-family: 'Sora', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(59,130,246,0.4);
+  transition: background 0.2s, transform 0.15s;
+}
+
+#float-nav-btn:hover {
+  background: #2563eb;
+  transform: translateY(-2px);
+}
+
+/* =========================
    Table (snapshot-table)
 ========================= */
 
@@ -495,6 +583,108 @@ p.error {
     overflow-x: auto;
     white-space: nowrap;
   }
+}
+
+/* =========================
+   Snapshot Controls (flight detail)
+========================= */
+
+#snapshot-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-width: 900px;
+  margin: 0 auto 0.75rem;
+  padding: 0 1rem;
+}
+
+#last-refreshed {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* =========================
+   Content Card (about, contact)
+========================= */
+
+.content-card {
+  max-width: 900px;
+  margin: 0 auto 2rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  line-height: 1.8;
+}
+
+.content-card--narrow {
+  max-width: 600px;
+  padding: 2rem;
+}
+
+.content-card p {
+  margin-bottom: 0.75rem;
+  color: var(--text-muted);
+}
+
+.content-card p:last-child {
+  margin-bottom: 0;
+}
+
+/* =========================
+   Page Hero (about, contact)
+========================= */
+
+.page-hero {
+  text-align: center;
+  padding: 2rem 1rem 1.5rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.page-hero h1 {
+  padding: 0 0 0.4rem;
+}
+
+.page-lead {
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  line-height: 1.6;
+}
+
+/* =========================
+   Contact Email Button
+========================= */
+
+.contact-email {
+  display: inline-block;
+  margin: 0.75rem 0 1.25rem;
+  padding: 0.6rem 1.25rem;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+}
+
+.contact-email:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.contact-disclaimer {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+  opacity: 0.7;
 }
 
 /* =========================
@@ -557,86 +747,4 @@ p.error {
     grid-column: 1 / -1;
     width: 100%;
   }
-}
-/* =========================
-   Content Card (about, contact)
-========================= */
-
-.content-card {
-  max-width: 900px;
-  margin: 0 auto 2rem;
-  padding: 1.5rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  line-height: 1.8;
-}
-
-/* Narrower variant for text-only pages */
-.content-card--narrow {
-  max-width: 600px;
-  padding: 2rem;
-}
-
-.content-card p {
-  margin-bottom: 0.75rem;
-  color: var(--text-muted);
-}
-
-.content-card p:last-child {
-  margin-bottom: 0;
-}
-
-/* =========================
-   Page Hero (about, contact h1 + lead)
-========================= */
-
-.page-hero {
-  text-align: center;
-  padding: 2rem 1rem 1.5rem;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-.page-hero h1 {
-  /* Reuse the existing h1 gradient style — no padding override needed */
-  padding: 0 0 0.4rem;
-}
-
-.page-lead {
-  font-size: 1rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-  line-height: 1.6;
-}
-
-/* =========================
-   Contact Email Button
-========================= */
-
-.contact-email {
-  display: inline-block;
-  margin: 0.75rem 0 1.25rem;
-  padding: 0.6rem 1.25rem;
-  background: var(--surface-2);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  color: var(--accent);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.9rem;
-  text-decoration: none;
-  transition: background 0.2s, color 0.2s;
-}
-
-.contact-email:hover {
-  background: var(--accent);
-  color: #fff;
-}
-
-.contact-disclaimer {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  margin-top: 0.5rem;
-  opacity: 0.7;
 }
