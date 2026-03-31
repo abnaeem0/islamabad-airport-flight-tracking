@@ -461,8 +461,9 @@ p.error {
 .history-label-wrap {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.3rem;
   min-width: 0;
+  padding: 0.1rem 0;
 }
 
 .history-flight {
@@ -538,7 +539,16 @@ p.error {
   border-radius: 999px;
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(59,130,246,0.4);
-  transition: background 0.2s, transform 0.15s;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s, background 0.2s;
+}
+
+#float-nav-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 #float-nav-btn:hover {
