@@ -21,31 +21,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Show history on page load
   renderHistory();
 
-  // Inject floating nav button
+  // Floating back-to-top button — hidden until user scrolls down 300px
   const floatBtn = document.createElement('button');
   floatBtn.id = 'float-nav-btn';
-  floatBtn.textContent = '↓ History';
+  floatBtn.textContent = '↑ Top';
+  floatBtn.setAttribute('aria-label', 'Back to top');
   document.body.appendChild(floatBtn);
 
-  // Toggle between scrolling to history and back to top
-  floatBtn.addEventListener('click', () => {
-    const historySection = document.getElementById('local-history');
-    const historyTop = historySection.getBoundingClientRect().top + window.scrollY;
-    const isNearHistory = window.scrollY + window.innerHeight >= historyTop - 100;
-
-    if (isNearHistory) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      historySection.scrollIntoView({ behavior: 'smooth' });
-    }
+  window.addEventListener('scroll', () => {
+    floatBtn.classList.toggle('visible', window.scrollY > 300);
   });
 
-  // Update button label based on scroll position
-  window.addEventListener('scroll', () => {
-    const historySection = document.getElementById('local-history');
-    const historyTop = historySection.getBoundingClientRect().top + window.scrollY;
-    const isNearHistory = window.scrollY + window.innerHeight >= historyTop - 100;
-    floatBtn.textContent = isNearHistory ? '↑ Top' : '↓ History';
+  floatBtn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
   // --- Utility ---
