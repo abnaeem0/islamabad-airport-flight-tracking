@@ -21,6 +21,33 @@ document.addEventListener('DOMContentLoaded', () => {
   // Show history on page load
   renderHistory();
 
+  // Inject floating nav button
+  const floatBtn = document.createElement('button');
+  floatBtn.id = 'float-nav-btn';
+  floatBtn.textContent = '↓ History';
+  document.body.appendChild(floatBtn);
+
+  // Toggle between scrolling to history and back to top
+  floatBtn.addEventListener('click', () => {
+    const historySection = document.getElementById('local-history');
+    const historyTop = historySection.getBoundingClientRect().top + window.scrollY;
+    const isNearHistory = window.scrollY + window.innerHeight >= historyTop - 100;
+
+    if (isNearHistory) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      historySection.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+
+  // Update button label based on scroll position
+  window.addEventListener('scroll', () => {
+    const historySection = document.getElementById('local-history');
+    const historyTop = historySection.getBoundingClientRect().top + window.scrollY;
+    const isNearHistory = window.scrollY + window.innerHeight >= historyTop - 100;
+    floatBtn.textContent = isNearHistory ? '↑ Top' : '↓ History';
+  });
+
   // --- Utility ---
   function timeToMinutes(t) {
     if (!t) return 0;
@@ -86,7 +113,12 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsDiv.appendChild(card);
       });
 
-      if (query) saveToLocalHistory(query, date);
+      // Save to history — always, whether flight number typed or date-only search
+      // Label reflects what was searched: flight number or date + type filter
+      const label = query
+        ? query
+        : `${date}${typeFilter ? ' · ' + typeFilter + 's' : ''}`;
+      saveToLocalHistory(label, date, !!query);
 
     } catch (err) {
       console.error(err);
@@ -98,13 +130,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- Local History ---
-  function saveToLocalHistory(flightNumber, date) {
+  // Each history entry: { label, date, isFlightSearch, userLabel }
+  // label       = flight number or date+type string
+  // isFlightSearch = true if a specific flight was searched (enables History button link)
+  // userLabel   = optional custom name set by the user (e.g. "Mr Haseeb")
+
+  function saveToLocalHistory(label, date, isFlightSearch) {
     let history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
-    history = history.filter(h => !(h.flightNumber === flightNumber && h.date === date));
-    history.unshift({ flightNumber, date });
-    if (history.length > 5) history.pop();
+    history = history.filter(h => !(h.label === label && h.date === date));
+    history.unshift({ label, date, isFlightSearch, userLabel: '' });
+    if (history.length > 10) history.pop();
     localStorage.setItem('flightHistory', JSON.stringify(history));
     renderHistory();
+  }
+
+  function saveHistory(history) {
+    localStorage.setItem('flightHistory', JSON.stringify(history));
   }
 
   function renderHistory() {
@@ -112,36 +153,94 @@ document.addEventListener('DOMContentLoaded', () => {
     historyList.innerHTML = '';
 
     if (!history.length) {
-      historyList.innerHTML = '<li>No recent searches.</li>';
+      historyList.innerHTML = '<li class="history-empty">No recent searches.</li>';
       return;
     }
 
     history.forEach((h, index) => {
       const li = document.createElement('li');
 
+      // Left side: label + optional user label
+      const labelWrap = document.createElement('div');
+      labelWrap.className = 'history-label-wrap';
+
       const span = document.createElement('span');
-      span.textContent = `${h.flightNumber} | ${h.date}`;
+      span.className = 'history-flight';
+      span.textContent = h.label + (h.date && h.isFlightSearch ? ` | ${h.date}` : '');
       span.style.cursor = 'pointer';
-      span.addEventListener('click', () => loadFlight(h.flightNumber, h.date));
+      span.addEventListener('click', () => loadFlight(h.label, h.date, h.isFlightSearch));
+
+      // User label (editable inline)
+      const userLabelEl = document.createElement('span');
+      userLabelEl.className = 'history-user-label';
+      userLabelEl.textContent = h.userLabel || '+ add label';
+      userLabelEl.style.cursor = 'pointer';
+      userLabelEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startEditing(userLabelEl, index);
+      });
+
+      labelWrap.appendChild(span);
+      labelWrap.appendChild(userLabelEl);
+
+      // Right side: reorder + delete buttons
+      const btnDiv = document.createElement('div');
+      btnDiv.className = 'history-buttons';
 
       const upBtn = document.createElement('button');
       upBtn.textContent = '↑';
-      upBtn.className = 'move-up';
+      upBtn.title = 'Move up';
       upBtn.addEventListener('click', () => moveHistory(index, -1));
 
       const downBtn = document.createElement('button');
       downBtn.textContent = '↓';
-      downBtn.className = 'move-down';
+      downBtn.title = 'Move down';
       downBtn.addEventListener('click', () => moveHistory(index, 1));
 
-      const btnDiv = document.createElement('div');
-      btnDiv.className = 'history-buttons';
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '×';
+      delBtn.title = 'Remove';
+      delBtn.className = 'history-delete';
+      delBtn.addEventListener('click', () => deleteHistory(index));
+
       btnDiv.appendChild(upBtn);
       btnDiv.appendChild(downBtn);
+      btnDiv.appendChild(delBtn);
 
-      li.appendChild(span);
+      li.appendChild(labelWrap);
       li.appendChild(btnDiv);
       historyList.appendChild(li);
+    });
+  }
+
+  function startEditing(el, index) {
+    const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
+    const current = history[index].userLabel || '';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = current;
+    input.className = 'history-label-input';
+    input.placeholder = 'e.g. Mr Haseeb';
+    input.maxLength = 40;
+
+    el.replaceWith(input);
+    input.focus();
+
+    function save() {
+      const val = input.value.trim();
+      history[index].userLabel = val;
+      saveHistory(history);
+      renderHistory();
+    }
+
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') input.blur();
+      if (e.key === 'Escape') {
+        input.value = current; // revert
+        input.blur();
+      }
     });
   }
 
@@ -150,7 +249,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= history.length) return;
     [history[index], history[newIndex]] = [history[newIndex], history[index]];
-    localStorage.setItem('flightHistory', JSON.stringify(history));
+    saveHistory(history);
+    renderHistory();
+  }
+
+  function deleteHistory(index) {
+    const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
+    history.splice(index, 1);
+    saveHistory(history);
     renderHistory();
   }
 
@@ -161,8 +267,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- Navigation ---
-  window.loadFlight = function(flightNumber, date) {
-    document.getElementById('flight-search').value = flightNumber;
+  window.loadFlight = function(label, date, isFlightSearch) {
+    if (isFlightSearch) {
+      document.getElementById('flight-search').value = label;
+    } else {
+      document.getElementById('flight-search').value = '';
+      // Restore type filter if encoded in label (e.g. "2026-03-31 · Arrivals")
+      const typeSelect = document.getElementById('flight-type');
+      if (label.includes('· Arrivals')) typeSelect.value = 'Arrival';
+      else if (label.includes('· Departures')) typeSelect.value = 'Departure';
+      else typeSelect.value = '';
+    }
     dateInput.value = date;
     searchBtn.click();
   };
