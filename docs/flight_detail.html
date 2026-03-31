@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Flight Details</title>
-<link rel="stylesheet" href="style.css">
-<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-<script src="flight_detail.js" defer></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flight Details | Islamabad Flight Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Supabase loads first (no defer), then our script -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="flight_detail.js" defer></script>
 </head>
 
 <!-- Google tag (gtag.js) -->
@@ -15,10 +16,9 @@
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-F5WJZW6DMV');
 </script>
-  
+
 <body>
   <header class="site-header">
     <div class="nav-container">
@@ -31,33 +31,31 @@
     </div>
   </header>
 
-<h1>Flight Details</h1>
-  
-<div id="flight-info">
-  <p id="flight-number"></p>
-  <p id="flight-date"></p>
-  <p id="flight-type"></p>
-  <p id="flight-city"></p>
-</div>
+  <h1>Flight Details</h1>
 
-<div id="snapshot-controls">
-  <label>
-    <input type="checkbox" id="toggle-all">
-    Show all snapshots (including unchanged)
-  </label>
-</div>  
+  <div id="flight-info">
+    <p>Loading...</p>
+  </div>
 
-<table id="snapshot-table">
-  <thead>
-    <tr>
-      <th>Scraped At</th>
-      <th>ST</th>
-      <th>ET</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+  <div id="snapshot-controls">
+    <label>
+      <input type="checkbox" id="toggle-all">
+      Show all snapshots (including unchanged)
+    </label>
+  </div>
+
+  <table id="snapshot-table">
+    <thead>
+      <tr>
+        <th>Scraped At</th>
+        <th>ST</th>
+        <th>ET</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
   <footer class="site-footer">
     <p>© 2026 Islamabad Flight Tracker</p>
     <nav>
@@ -66,6 +64,5 @@
       <a href="contact.html">Contact</a>
     </nav>
   </footer>
-
 </body>
 </html>
