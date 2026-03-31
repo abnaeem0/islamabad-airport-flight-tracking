@@ -558,3 +558,26 @@ p.error {
     width: 100%;
   }
 }
+/* =========================
+   Content Card (about, contact)
+========================= */
+
+.content-card {
+  max-width: 900px;
+  margin: 0 auto 2rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  line-height: 1.8;
+}
+
+.content-card p {
+  margin-bottom: 0.75rem;
+  color: var(--text-muted);
+}
+
+.content-card p:last-child {
+  margin-bottom: 0;
+}
