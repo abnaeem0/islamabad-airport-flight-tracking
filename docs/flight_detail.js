@@ -28,7 +28,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Render null/undefined as a dash instead of the word "null"
   function display(val) {
     return val ?? '—';
   }
@@ -36,6 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ===== RENDER =====
   const toggleAllCheckbox = document.getElementById('toggle-all');
   const tbody = document.querySelector('#snapshot-table tbody');
+  const lastRefreshedEl = document.getElementById('last-refreshed');
 
   function renderSnapshots(snapshots) {
     tbody.innerHTML = '';
@@ -71,38 +71,59 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ===== FETCH =====
-  try {
-    const { data: snapshots, error } = await client
-      .from('flight_snapshots')
-      .select('*')
-      .eq('flight_number', flightNumber)
-      .eq('scheduled_date', date)
-      .order('scraped_at', { ascending: true });
+  async function fetchAndRender() {
+    try {
+      const { data: snapshots, error } = await client
+        .from('flight_snapshots')
+        .select('*')
+        .eq('flight_number', flightNumber)
+        .eq('scheduled_date', date)
+        .order('scraped_at', { ascending: true });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    if (!snapshots.length) {
-      flightInfoDiv.innerHTML = '<p>No history available for this flight.</p>';
-      document.getElementById('snapshot-controls').style.display = 'none';
-      return;
+      if (!snapshots.length) {
+        flightInfoDiv.innerHTML = '<p>No history available for this flight.</p>';
+        document.getElementById('snapshot-controls').style.display = 'none';
+        return;
+      }
+
+      // Populate header from first snapshot (only on first load)
+      if (flightInfoDiv.querySelector('#flight-number') === null) {
+        const first = snapshots[0];
+        flightInfoDiv.innerHTML = `
+          <p id="flight-number">Flight: ${display(first.flight_number)}</p>
+          <p id="flight-date">Date: ${display(first.scheduled_date)}</p>
+          <p id="flight-type">Type: ${display(first.type)}</p>
+          <p id="flight-city">${first.type === 'Arrival' ? 'From' : 'To'}: ${display(first.city)}</p>
+        `;
+      }
+
+      renderSnapshots(snapshots);
+
+      // Update last refreshed timestamp
+      const now = new Date().toLocaleString('en-GB', {
+        timeZone: 'Asia/Karachi',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+      if (lastRefreshedEl) lastRefreshedEl.textContent = `Last refreshed: ${now}`;
+
+    } catch (err) {
+      console.error(err);
+      // Only show error on first load — don't wipe the page on a background refresh failure
+      if (flightInfoDiv.querySelector('#flight-number') === null) {
+        flightInfoDiv.innerHTML = '<p>Error loading flight history. Please try again.</p>';
+      }
     }
-
-    // Populate header from first snapshot
-    const first = snapshots[0];
-    flightInfoDiv.innerHTML = `
-      <p id="flight-number">Flight: ${display(first.flight_number)}</p>
-      <p id="flight-date">Date: ${display(first.scheduled_date)}</p>
-      <p id="flight-type">Type: ${display(first.type)}</p>
-      <p id="flight-city">${first.type === 'Arrival' ? 'From' : 'To'}: ${display(first.city)}</p>
-    `;
-
-    renderSnapshots(snapshots);
-
-    toggleAllCheckbox.addEventListener('change', () => renderSnapshots(snapshots));
-
-  } catch (err) {
-    console.error(err);
-    flightInfoDiv.innerHTML = '<p>Error loading flight history. Please try again.</p>';
   }
+
+  // Initial load
+  await fetchAndRender();
+
+  // Wire up checkbox after first load
+  toggleAllCheckbox.addEventListener('change', fetchAndRender);
+
+  // Auto-refresh every 5 minutes
+  setInterval(fetchAndRender, 5 * 60 * 1000);
 
 });
