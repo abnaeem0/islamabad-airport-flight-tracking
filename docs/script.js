@@ -84,19 +84,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
       filtered.sort((a, b) => timeToMinutes(a.st) - timeToMinutes(b.st));
 
+      // Pakistani airlines — served from local GitHub Pages logos folder
+      const LOCAL_AIRLINES = ['PK', 'PF', '9P', 'PA'];
+      const REPO_LOGOS = 'https://abnaeem0.github.io/islamabad-airport-flight-tracking/logos/';
+
+      function getLogoUrl(flightNumber) {
+        const code = flightNumber.slice(0, 2).toUpperCase();
+        if (LOCAL_AIRLINES.includes(code)) {
+          return `${REPO_LOGOS}${code.toLowerCase()}.png`;
+        }
+        return `https://pics.avs.io/60/60/${code}.png`;
+      }
+
       // Render results safely without inline onclick
       resultsDiv.innerHTML = '';
       filtered.forEach(f => {
         const card = document.createElement('div');
         card.className = 'flight-card';
-        card.innerHTML = `
-          ${f.airline_logo ? `<img src="${f.airline_logo}" width="40" alt="${f.flight_number} logo">` : ''}
+
+        const logoUrl = getLogoUrl(f.flight_number);
+        const img = document.createElement('img');
+        img.src = logoUrl;
+        img.alt = f.flight_number + ' logo';
+        img.width = 40;
+        img.height = 40;
+        // Hide image cleanly if CDN returns a broken image for obscure airlines
+        img.onerror = function() { this.style.display = 'none'; };
+
+        const info = document.createElement('div');
+        info.innerHTML = `
           <strong>${f.flight_number}</strong> | ${f.type} | ${f.city}<br>
-          ST: ${f.st} | ET: ${f.et} | Status: ${f.status}
+          ST: ${f.st ?? '—'} | ET: ${f.et ?? '—'} | Status: ${f.status ?? '—'}
         `;
+
         const btn = document.createElement('button');
         btn.textContent = 'History';
         btn.addEventListener('click', () => viewHistory(f.flight_number, date));
+
+        card.appendChild(img);
+        card.appendChild(info);
         card.appendChild(btn);
         resultsDiv.appendChild(card);
       });
