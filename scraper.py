@@ -226,8 +226,7 @@ def main():
                     snapshot_rows.append({
                         **flat,
                         "scraped_at": fetched_at,
-                        "is_changed": is_changed,
-                        "last_updated": flat["last_updated"]
+                        "is_changed": is_changed
                     })
 
                 # Batch insert snapshots for seen flights
@@ -236,7 +235,7 @@ def main():
                         execute_values(cursor, """
                             INSERT INTO flight_snapshots (
                                 flight_number, scheduled_date, scraped_at, is_changed,
-                                status, ST, ET, city, type, airline_logo,last_updated
+                                status, ST, ET, city, type, airline_logo
                             ) VALUES %s
                         """, [
                             (
@@ -249,8 +248,7 @@ def main():
                                 r["ET"],
                                 r["city"],
                                 r["type"],
-                                r["airline_logo"],
-                                r["last_updated"]
+                                r["airline_logo"]
                             ) for r in snapshot_rows
                         ])
                     except Exception as e:
