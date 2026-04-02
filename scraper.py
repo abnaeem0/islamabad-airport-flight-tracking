@@ -249,7 +249,8 @@ def main():
                                 r["ET"],
                                 r["city"],
                                 r["type"],
-                                r["airline_logo"]
+                                r["airline_logo"],
+                                r["last_updated"]
                             ) for r in snapshot_rows
                         ])
                     except Exception as e:
