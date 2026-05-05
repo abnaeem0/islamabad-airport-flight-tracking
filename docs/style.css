@@ -758,3 +758,14 @@ p.error {
     width: 100%;
   }
 }
+.flight-nature {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  margin-left: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.flight-nature.international { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.flight-nature.domestic       { background: rgba(16,185,129,0.15); color: #34d399; }
