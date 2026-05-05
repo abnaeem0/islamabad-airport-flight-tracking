@@ -45,7 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Search ---
   searchBtn.addEventListener('click', async () => {
-    const query = document.getElementById('flight-search').value.trim();
+    const raw = document.getElementById('flight-search').value.trim();
+    const query = raw.replace(/[\s\-_]/g, '').toUpperCase();
     const date = dateInput.value;
     const typeFilter = document.getElementById('flight-type').value;
     const cityFilter = citySelect.value;
