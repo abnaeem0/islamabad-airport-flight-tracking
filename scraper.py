@@ -62,6 +62,8 @@ def fetch_flights(date_str, tag):
 def flatten_flight(raw, tag, date_str, fetched_at):
     """
     Convert a raw PAA API flight dict into our DB-friendly flat dict.
+    - Strips spaces from flight number so TK 571 becomes TK571
+    - Captures Nature (International/Domestic) from the API
     Returns None if the flight has no flight number (unusable record).
     """
     flight_number = raw.get("FlightNumber")
@@ -70,7 +72,7 @@ def flatten_flight(raw, tag, date_str, fetched_at):
         return None
 
     return {
-        "flight_number": flight_number.replace(" ", ""),
+        "flight_number":  flight_number.replace(" ", ""),
         "scheduled_date": date_str,
         "type":           tag,
         "city":           raw.get("EnglishFromCity") if tag == "Arrival" else raw.get("EnglishToCity"),
@@ -80,7 +82,7 @@ def flatten_flight(raw, tag, date_str, fetched_at):
         "ET":             raw.get("ET"),
         "last_checked":   fetched_at,
         "last_updated":   raw.get("DateUpdated"),
-        "nature": raw.get("Nature"),
+        "nature":         raw.get("Nature"),
     }
 
 
@@ -171,13 +173,14 @@ def mark_dropped_flights(cursor, date_str, tag, seen_flight_numbers, fetched_at)
     """, (fetched_at, date_str, tag, dropped))
 
     # Insert one snapshot per dropped flight to record the event
+    # nature is None for dropped flights — we don't know it at drop time
     execute_values(cursor, """
         INSERT INTO flight_snapshots (
             flight_number, scheduled_date, scraped_at, is_changed,
             change_type, status, ST, ET, city, type, airline_logo, nature
         ) VALUES %s
     """, [
-        (fn, date_str, fetched_at, True, "dropped", "Dropped", None, None, None, tag, None)
+        (fn, date_str, fetched_at, True, "dropped", "Dropped", None, None, None, tag, None, None)
         for fn in dropped
     ])
 
@@ -290,10 +293,10 @@ def main():
                     cursor.execute("""
                         INSERT INTO flights (
                             flight_number, scheduled_date, type, city, airline_logo,
-                            status, ST, ET, last_checked, last_updated
+                            status, ST, ET, last_checked, last_updated, nature
                         ) VALUES (
                             %(flight_number)s, %(scheduled_date)s, %(type)s, %(city)s, %(airline_logo)s,
-                            %(status)s, %(ST)s, %(ET)s, %(last_checked)s, %(last_updated)s
+                            %(status)s, %(ST)s, %(ET)s, %(last_checked)s, %(last_updated)s, %(nature)s
                         )
                         ON CONFLICT (flight_number, scheduled_date, type)
                         DO UPDATE SET
@@ -329,6 +332,7 @@ def main():
                             flat["city"],
                             flat["type"],
                             flat["airline_logo"],
+                            flat["nature"],
                         ))
 
                 # --- Batch insert changed snapshots ---
@@ -337,7 +341,7 @@ def main():
                         execute_values(cursor, """
                             INSERT INTO flight_snapshots (
                                 flight_number, scheduled_date, scraped_at, is_changed,
-                                change_type, status, ST, ET, city, type, airline_logo
+                                change_type, status, ST, ET, city, type, airline_logo, nature
                             ) VALUES %s
                         """, snapshot_rows)
                     except Exception as e:
