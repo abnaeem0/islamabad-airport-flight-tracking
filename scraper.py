@@ -80,6 +80,7 @@ def flatten_flight(raw, tag, date_str, fetched_at):
         "ET":             raw.get("ET"),
         "last_checked":   fetched_at,
         "last_updated":   raw.get("DateUpdated"),
+        "nature": raw.get("Nature"),
     }
 
 
@@ -173,7 +174,7 @@ def mark_dropped_flights(cursor, date_str, tag, seen_flight_numbers, fetched_at)
     execute_values(cursor, """
         INSERT INTO flight_snapshots (
             flight_number, scheduled_date, scraped_at, is_changed,
-            change_type, status, ST, ET, city, type, airline_logo
+            change_type, status, ST, ET, city, type, airline_logo, nature
         ) VALUES %s
     """, [
         (fn, date_str, fetched_at, True, "dropped", "Dropped", None, None, None, tag, None)
@@ -302,6 +303,7 @@ def main():
                             ST            = EXCLUDED.ST,
                             ET            = EXCLUDED.ET,
                             last_checked  = EXCLUDED.last_checked,
+                            nature        = EXCLUDED.nature,
                             last_updated  = CASE
                                 WHEN flights.status   IS DISTINCT FROM EXCLUDED.status
                                   OR flights.ST       IS DISTINCT FROM EXCLUDED.ST
