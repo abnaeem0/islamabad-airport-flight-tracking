@@ -70,7 +70,7 @@ def flatten_flight(raw, tag, date_str, fetched_at):
         return None
 
     return {
-        "flight_number":  flight_number,
+        "flight_number": flight_number.replace(" ", ""),
         "scheduled_date": date_str,
         "type":           tag,
         "city":           raw.get("EnglishFromCity") if tag == "Arrival" else raw.get("EnglishToCity"),
