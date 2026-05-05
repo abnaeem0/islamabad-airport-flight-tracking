@@ -1,76 +1,111 @@
 document.addEventListener('DOMContentLoaded', async () => {
 
   // ===== URL PARAM VALIDATION =====
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams    = new URLSearchParams(window.location.search);
   const flightNumber = urlParams.get('flight');
-  const date = urlParams.get('date');
+  const date         = urlParams.get('date');
   const flightInfoDiv = document.getElementById('flight-info');
 
   if (!flightNumber || !date) {
     flightInfoDiv.innerHTML = '<p>Invalid page link. No flight or date specified. <a href="index.html">Go back to search</a>.</p>';
     document.getElementById('snapshot-controls').style.display = 'none';
-    document.getElementById('snapshot-table').style.display = 'none';
+    document.getElementById('snapshot-table').style.display   = 'none';
     return;
   }
 
   // ===== SUPABASE =====
   const supabaseUrl = 'https://sbaweaytsmdmhaclgcwr.supabase.co';
   const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
-  const client = supabase.createClient(supabaseUrl, supabaseKey);
+  const client      = supabase.createClient(supabaseUrl, supabaseKey);
 
   // ===== UTILS =====
+
+  // Format a UTC timestamp string as PKT local time
   function formatPKT(dateStr) {
     const utcDate = new Date(dateStr + 'Z');
     return utcDate.toLocaleString('en-GB', {
-      timeZone: 'Asia/Karachi',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit'
+      timeZone:   'Asia/Karachi',
+      year:       'numeric',
+      month:      '2-digit',
+      day:        '2-digit',
+      hour:       '2-digit',
+      minute:     '2-digit',
     });
   }
 
+  // Return value or a dash for null/undefined
   function display(val) {
     return val ?? '—';
   }
 
-  // ===== RENDER =====
-  const toggleAllCheckbox = document.getElementById('toggle-all');
-  const tbody = document.querySelector('#snapshot-table tbody');
-  const lastRefreshedEl = document.getElementById('last-refreshed');
+  // Human-readable "X mins ago" from a UTC timestamp string
+  function timeAgo(dateStr) {
+    const diffMs   = Date.now() - new Date(dateStr).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1)  return 'just now';
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+    const diffHrs = Math.floor(diffMins / 60);
+    return `${diffHrs} hour${diffHrs > 1 ? 's' : ''} ago`;
+  }
 
-  function renderSnapshots(snapshots) {
-    tbody.innerHTML = '';
-    let prev = null;
-
-    snapshots.forEach(s => {
-      const st = s.st;
-      const et = s.et;
-      const status = s.status;
-
-      const showRow = toggleAllCheckbox.checked
-        || !prev
-        || st !== prev.st
-        || et !== prev.et
-        || status !== prev.status;
-
-      if (showRow) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${formatPKT(s.scraped_at)}</td>
-          <td>${display(st)}</td>
-          <td>${display(et)}</td>
-          <td>${display(status)}</td>
-        `;
-        tbody.appendChild(tr);
-        prev = { st, et, status };
-      }
-    });
-
-    if (!tbody.hasChildNodes()) {
-      tbody.innerHTML = '<tr><td colspan="4">No snapshot data to display.</td></tr>';
+  // Human-readable label for each change_type value
+  function changeLabel(changeType) {
+    switch (changeType) {
+      case 'new':           return '🆕 First seen';
+      case 'status_change': return '🔄 Status changed';
+      case 'time_change':   return '🕐 Time changed';
+      case 'city_change':   return '📍 City changed';
+      case 'dropped':       return '⚠️ Dropped';
+      default:              return '';
     }
   }
 
-  // ===== FETCH =====
+  // ===== DOM REFS =====
+  const toggleAllCheckbox = document.getElementById('toggle-all');
+  const lastRefreshedEl   = document.getElementById('last-refreshed');
+  const tbody             = document.querySelector('#snapshot-table tbody');
+
+  // ===== RENDER SNAPSHOTS =====
+  function renderSnapshots(snapshots) {
+    tbody.innerHTML = '';
+
+    if (!snapshots.length) {
+      tbody.innerHTML = '<tr><td colspan="5">No changes recorded for this flight.</td></tr>';
+      return;
+    }
+
+    snapshots.forEach(s => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${formatPKT(s.scraped_at)}</td>
+        <td>${display(s.st)}</td>
+        <td>${display(s.et)}</td>
+        <td>${display(s.status)}</td>
+        <td>${changeLabel(s.change_type)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ===== FETCH SCRAPER FRESHNESS =====
+  async function fetchFreshness() {
+    try {
+      const { data, error } = await client
+        .from('scraper_status')
+        .select('last_run')
+        .eq('id', 1)
+        .single();
+
+      if (error || !data) return;
+      if (lastRefreshedEl) {
+        lastRefreshedEl.textContent = `Last checked: ${timeAgo(data.last_run)}`;
+      }
+    } catch (e) {
+      // Freshness is non-critical — fail silently
+    }
+  }
+
+  // ===== FETCH SNAPSHOTS & RENDER =====
   async function fetchAndRender() {
     try {
       const { data: snapshots, error } = await client
@@ -88,7 +123,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      // Populate header from first snapshot (only on first load)
+      // Populate flight header from first snapshot (only on first load)
       if (flightInfoDiv.querySelector('#flight-number') === null) {
         const first = snapshots[0];
         flightInfoDiv.innerHTML = `
@@ -101,29 +136,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       renderSnapshots(snapshots);
 
-      // Update last refreshed timestamp
-      const now = new Date().toLocaleString('en-GB', {
-        timeZone: 'Asia/Karachi',
-        hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-      if (lastRefreshedEl) lastRefreshedEl.textContent = `Last refreshed: ${now}`;
-
     } catch (err) {
       console.error(err);
-      // Only show error on first load — don't wipe the page on a background refresh failure
+      // Only show error message on first load — don't wipe page on background refresh failure
       if (flightInfoDiv.querySelector('#flight-number') === null) {
         flightInfoDiv.innerHTML = '<p>Error loading flight history. Please try again.</p>';
       }
     }
   }
 
-  // Initial load
+  // ===== INIT =====
   await fetchAndRender();
+  await fetchFreshness();
 
-  // Wire up checkbox after first load
+  // Checkbox no longer needed (we only store changes now) but kept for compatibility
   toggleAllCheckbox.addEventListener('change', fetchAndRender);
 
   // Auto-refresh every 5 minutes
-  setInterval(fetchAndRender, 5 * 60 * 1000);
+  setInterval(async () => {
+    await fetchAndRender();
+    await fetchFreshness();
+  }, 5 * 60 * 1000);
 
 });
