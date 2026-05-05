@@ -6,88 +6,142 @@ import urllib3
 import psycopg2
 from psycopg2.extras import execute_values, RealDictCursor
 
-# ===== CONFIG =====
-CITY = "Islamabad"
-SOURCE = "PAA"
-PAA_TEMPLATE = "https://paaconnectapi.paa.gov.pk/api/flights/{date}/{type}/" + CITY
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# ===== DB CONFIG =====
-DB_HOST = os.environ.get("DB_HOST")
-DB_NAME = os.environ.get("DB_NAME")
-DB_USER = os.environ.get("DB_USER")
-DB_PASSWORD = os.environ.get("DB_PASSWORD")
-DB_PORT = int(os.environ.get("DB_PORT", 5432))
 
-# ===== UTILS =====
+# ==============================================================================
+#   CONFIG
+# ==============================================================================
+
+CITY         = "Islamabad"
+PAA_TEMPLATE = "https://paaconnectapi.paa.gov.pk/api/flights/{date}/{type}/" + CITY
+
+# Statuses that mean a flight is finished — we don't snapshot these again
+TERMINAL_STATUSES = ("Dropped", "Cancelled", "Landed", "Departed")
+
+# DB credentials come from environment variables (never hardcode these)
+DB_HOST     = os.environ.get("DB_HOST")
+DB_NAME     = os.environ.get("DB_NAME")
+DB_USER     = os.environ.get("DB_USER")
+DB_PASSWORD = os.environ.get("DB_PASSWORD")
+DB_PORT     = int(os.environ.get("DB_PORT", 5432))
+
+
+# ==============================================================================
+#   LOGGING
+# ==============================================================================
+
 def log(msg):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{ts}] {msg}")
 
+
+# ==============================================================================
+#   PAA API
+# ==============================================================================
+
 def fetch_flights(date_str, tag):
+    """
+    Fetch flights from the PAA API for a given date and type (Arrival/Departure).
+    Returns a list of raw flight dicts, or an empty list on failure.
+    """
     url = PAA_TEMPLATE.format(date=date_str, type=tag)
     try:
         r = requests.get(url, verify=False, timeout=20)
         if r.status_code == 200:
             data = r.json()
             if isinstance(data, list):
-                log(f"{len(data)} flights retrieved for {tag} {date_str}")
+                log(f"  {len(data)} flights fetched for {tag} on {date_str}")
                 return data
-        log(f"Fetch failed {url} code {r.status_code}")
+        log(f"  [WARN] Fetch failed for {url} — HTTP {r.status_code}")
     except Exception as e:
-        log(f"Error fetching {url}: {e}")
+        log(f"  [ERROR] Exception fetching {url}: {e}")
     return []
 
-def flatten_flight(f, tag, date_str, fetched_at):
-    flight_number = f.get("FlightNumber")
+
+def flatten_flight(raw, tag, date_str, fetched_at):
+    """
+    Convert a raw PAA API flight dict into our DB-friendly flat dict.
+    Returns None if the flight has no flight number (unusable record).
+    """
+    flight_number = raw.get("FlightNumber")
     if not flight_number:
-        log(f"[WARNING] Skipping flight with missing FlightNumber for {tag} {date_str}")
+        log(f"  [WARN] Skipping record with no FlightNumber for {tag} {date_str}")
         return None
+
     return {
-        "flight_number": flight_number,
+        "flight_number":  flight_number,
         "scheduled_date": date_str,
-        "type": tag,
-        "city": f.get("EnglishFromCity") if tag == "Arrival" else f.get("EnglishToCity"),
-        "airline_logo": f.get("Logo"),
-        "status": f.get("EnglishRemarks"),
-        "ST": f.get("ST"),
-        "ET": f.get("ET"),
-        "last_checked": fetched_at,
-        "last_updated": f.get("DateUpdated")
+        "type":           tag,
+        "city":           raw.get("EnglishFromCity") if tag == "Arrival" else raw.get("EnglishToCity"),
+        "airline_logo":   raw.get("Logo"),
+        "status":         raw.get("EnglishRemarks"),
+        "ST":             raw.get("ST"),
+        "ET":             raw.get("ET"),
+        "last_checked":   fetched_at,
+        "last_updated":   raw.get("DateUpdated"),
     }
 
-def has_flight_changed(existing, flat):
-    """Return True when API data differs from the current flights table row."""
-    if existing is None:
-        return True
-    return any([
-        existing["city"] != flat["city"],
-        existing["airline_logo"] != flat["airline_logo"],
-        existing["status"] != flat["status"],
-        existing["st"] != flat["ST"],
-        existing["et"] != flat["ET"],
-    ])
 
-def mark_dropped_flights(cursor, conn, date_str, tag, seen_flight_numbers, fetched_at):
+# ==============================================================================
+#   CHANGE DETECTION
+# ==============================================================================
+
+def detect_change(existing, flat):
     """
-    Find flights that were in the DB for this date+type but are missing
-    from the current API response, and mark their status as 'Dropped'.
+    Compare the current DB row against the freshly fetched flight data.
 
-    Only flights NOT already in a terminal state are eligible:
-    - Excludes: Dropped, Cancelled, Landed, Departed
-    - This avoids re-flagging flights that already have a final status.
+    Returns a tuple: (is_changed: bool, change_type: str | None)
+
+    change_type values:
+      - "new"           — flight not seen before
+      - "status_change" — status text changed
+      - "time_change"   — ST or ET changed
+      - "city_change"   — origin/destination city changed
+      - None            — nothing changed
+    """
+
+    # Brand new flight — never seen before
+    if existing is None:
+        return True, "new"
+
+    # Status changed (e.g. On Time → Delayed, or blank → Cancelled)
+    if existing["status"] != flat["status"]:
+        return True, "status_change"
+
+    # Scheduled or estimated time changed
+    if existing["st"] != flat["ST"] or existing["et"] != flat["ET"]:
+        return True, "time_change"
+
+    # City changed (rare but possible with routing changes)
+    if existing["city"] != flat["city"]:
+        return True, "city_change"
+
+    # Nothing changed
+    return False, None
+
+
+# ==============================================================================
+#   DROP DETECTION
+# ==============================================================================
+
+def mark_dropped_flights(cursor, date_str, tag, seen_flight_numbers, fetched_at):
+    """
+    After processing all API flights, check whether any flights that were
+    previously in our DB are now missing from the API response.
+
+    If a flight disappears without reaching a terminal status, we mark it
+    as 'Dropped' — the airport silently removed it without cancelling it.
+
+    Safety check: if the API returned zero flights, we skip this entirely
+    to avoid mass-marking everything as dropped due to a failed fetch.
     """
     if not seen_flight_numbers:
-        # If API returned nothing at all, skip — likely a failed fetch,
-        # not a real drop. We don't want to mass-mark everything as dropped.
-        log(f"[DROP] Skipping drop check for {tag} {date_str} — API returned 0 flights")
+        log(f"  [DROP] Skipping drop check — API returned 0 flights for {tag} {date_str}")
         return
 
-    TERMINAL_STATUSES = ("Dropped", "Cancelled", "Landed", "Departed")
-
-    # Fetch all active flights for this date+type that weren't in the API response
     cursor.execute("""
-        SELECT flight_number, status
+        SELECT flight_number
         FROM flights
         WHERE scheduled_date = %s
           AND type = %s
@@ -97,55 +151,86 @@ def mark_dropped_flights(cursor, conn, date_str, tag, seen_flight_numbers, fetch
         date_str,
         tag,
         list(seen_flight_numbers),
-        list(TERMINAL_STATUSES)
+        list(TERMINAL_STATUSES),
     ))
 
-    dropped = cursor.fetchall()
+    dropped = [row["flight_number"] for row in cursor.fetchall()]
     if not dropped:
         return
 
-    dropped_numbers = [row["flight_number"] for row in dropped]
-    log(f"[DROP] Marking {len(dropped_numbers)} flights as Dropped for {tag} {date_str}: {dropped_numbers}")
+    log(f"  [DROP] Marking {len(dropped)} flights as Dropped for {tag} {date_str}: {dropped}")
 
-    # Update their status in the flights table
+    # Update status in the flights table
     cursor.execute("""
         UPDATE flights
-        SET status = 'Dropped',
-            last_checked = %s
+        SET status = 'Dropped', last_checked = %s
         WHERE scheduled_date = %s
           AND type = %s
           AND flight_number = ANY(%s)
-    """, (fetched_at, date_str, tag, dropped_numbers))
+    """, (fetched_at, date_str, tag, dropped))
 
-    # Also insert a snapshot row for each dropped flight so the event is recorded
-    snapshot_rows = [
-        (fn, date_str, fetched_at, True, "Dropped", None, None, None, tag, None)
-        for fn in dropped_numbers
-    ]
-    try:
-        execute_values(cursor, """
-            INSERT INTO flight_snapshots (
-                flight_number, scheduled_date, scraped_at, is_changed,
-                status, ST, ET, city, type, airline_logo
-            ) VALUES %s
-        """, snapshot_rows)
-    except Exception as e:
-        log(f"[DROP] Snapshot insert failed for dropped flights: {e}")
-        raise
+    # Insert one snapshot per dropped flight to record the event
+    execute_values(cursor, """
+        INSERT INTO flight_snapshots (
+            flight_number, scheduled_date, scraped_at, is_changed,
+            change_type, status, ST, ET, city, type, airline_logo
+        ) VALUES %s
+    """, [
+        (fn, date_str, fetched_at, True, "dropped", "Dropped", None, None, None, tag, None)
+        for fn in dropped
+    ])
 
 
-# ===== MAIN =====
+# ==============================================================================
+#   SCRAPER STATUS (freshness timestamp for the frontend)
+# ==============================================================================
+
+def update_scraper_status(cursor):
+    """
+    Update the single-row scraper_status table with the current UTC timestamp.
+    The frontend reads this to show users "Last checked X minutes ago."
+    """
+    now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    cursor.execute("""
+        INSERT INTO scraper_status (id, last_run)
+        VALUES (1, %s)
+        ON CONFLICT (id) DO UPDATE SET last_run = EXCLUDED.last_run
+    """, (now_utc,))
+
+
+# ==============================================================================
+#   CLEANUP (keeps DB lean — deletes data older than 2 months)
+# ==============================================================================
+
+def cleanup_old_data(cursor):
+    """
+    Delete flights and snapshots older than 2 months.
+    Runs at the end of every scrape to keep the DB size manageable.
+    """
+    cursor.execute("""
+        DELETE FROM flight_snapshots
+        WHERE scraped_at < NOW() - INTERVAL '2 months'
+    """)
+    cursor.execute("""
+        DELETE FROM flights
+        WHERE scheduled_date < (CURRENT_DATE - INTERVAL '2 months')
+    """)
+    log("  [CLEANUP] Old data deleted (>2 months)")
+
+
+# ==============================================================================
+#   MAIN
+# ==============================================================================
+
 def main():
+
+    # --- Connect to DB ---
     try:
         conn = psycopg2.connect(
-            host=DB_HOST,
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            port=DB_PORT,
-            sslmode="require"
+            host=DB_HOST, dbname=DB_NAME, user=DB_USER,
+            password=DB_PASSWORD, port=DB_PORT, sslmode="require"
         )
-        log("✅ DB connection successful!")
+        log("✅ DB connected")
     except Exception as e:
         log(f"❌ DB connection failed: {e}")
         raise
@@ -154,37 +239,40 @@ def main():
 
     try:
         now = datetime.datetime.now()
+
+        # Scrape yesterday, today, and tomorrow
         dates = [
-            (now + datetime.timedelta(days=-1)).strftime("%Y-%m-%d"),
+            (now - datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
             now.strftime("%Y-%m-%d"),
-            (now + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+            (now + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
         ]
-        tags = ["Arrival", "Departure"]
 
         for date_str in dates:
-            for tag in tags:
+            for tag in ["Arrival", "Departure"]:
+
+                log(f"\n--- {tag} | {date_str} ---")
                 fetched_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
-                flights = fetch_flights(date_str, tag)
 
-                # Track which flight numbers the API returned this run
+                # --- Fetch from PAA API ---
+                raw_flights = fetch_flights(date_str, tag)
+                if not raw_flights:
+                    continue  # Skip drop detection too — fetch may have failed
+
                 seen_flight_numbers = set()
+                changed_count       = 0
+                snapshot_rows       = []
 
-                if not flights:
-                    # Don't run drop detection — fetch may have simply failed
-                    continue
-
-                changed_count = 0
-                snapshot_rows = []
-
-                for f in flights:
-                    flat = flatten_flight(f, tag, date_str, fetched_at)
+                # --- Process each flight ---
+                for raw in raw_flights:
+                    flat = flatten_flight(raw, tag, date_str, fetched_at)
                     if not flat:
                         continue
 
                     seen_flight_numbers.add(flat["flight_number"])
 
+                    # Look up existing DB row for this flight
                     cursor.execute("""
-                        SELECT city, airline_logo, status, ST, ET
+                        SELECT city, status, st, et
                         FROM flights
                         WHERE flight_number = %(flight_number)s
                           AND scheduled_date = %(scheduled_date)s
@@ -192,8 +280,12 @@ def main():
                     """, flat)
                     existing = cursor.fetchone()
 
-                    is_changed = has_flight_changed(existing, flat)
+                    # Detect what (if anything) changed
+                    is_changed, change_type = detect_change(existing, flat)
 
+                    # --- Upsert into flights table ---
+                    # Always update the flights table with the latest data.
+                    # last_updated is only changed when meaningful fields change.
                     cursor.execute("""
                         INSERT INTO flights (
                             flight_number, scheduled_date, type, city, airline_logo,
@@ -204,68 +296,73 @@ def main():
                         )
                         ON CONFLICT (flight_number, scheduled_date, type)
                         DO UPDATE SET
-                            city = EXCLUDED.city,
-                            airline_logo = EXCLUDED.airline_logo,
-                            status = EXCLUDED.status,
-                            ST = EXCLUDED.ST,
-                            ET = EXCLUDED.ET,
-                            last_updated = CASE
-                                WHEN flights.status IS DISTINCT FROM EXCLUDED.status
-                                     OR flights.ST IS DISTINCT FROM EXCLUDED.ST
-                                     OR flights.ET IS DISTINCT FROM EXCLUDED.ET
-                                     OR flights.city IS DISTINCT FROM EXCLUDED.city
-                                     OR flights.airline_logo IS DISTINCT FROM EXCLUDED.airline_logo
+                            city          = EXCLUDED.city,
+                            airline_logo  = EXCLUDED.airline_logo,
+                            status        = EXCLUDED.status,
+                            ST            = EXCLUDED.ST,
+                            ET            = EXCLUDED.ET,
+                            last_checked  = EXCLUDED.last_checked,
+                            last_updated  = CASE
+                                WHEN flights.status   IS DISTINCT FROM EXCLUDED.status
+                                  OR flights.ST       IS DISTINCT FROM EXCLUDED.ST
+                                  OR flights.ET       IS DISTINCT FROM EXCLUDED.ET
+                                  OR flights.city     IS DISTINCT FROM EXCLUDED.city
                                 THEN EXCLUDED.last_updated
                                 ELSE flights.last_updated
-                            END;
+                            END
                     """, flat)
 
+                    # --- Only snapshot when something actually changed ---
                     if is_changed:
                         changed_count += 1
+                        snapshot_rows.append((
+                            flat["flight_number"],
+                            flat["scheduled_date"],
+                            fetched_at,
+                            True,
+                            change_type,
+                            flat["status"],
+                            flat["ST"],
+                            flat["ET"],
+                            flat["city"],
+                            flat["type"],
+                            flat["airline_logo"],
+                        ))
 
-                    snapshot_rows.append({
-                        **flat,
-                        "scraped_at": fetched_at,
-                        "is_changed": is_changed
-                    })
-
-                # Batch insert snapshots for seen flights
+                # --- Batch insert changed snapshots ---
                 if snapshot_rows:
                     try:
                         execute_values(cursor, """
                             INSERT INTO flight_snapshots (
                                 flight_number, scheduled_date, scraped_at, is_changed,
-                                status, ST, ET, city, type, airline_logo
+                                change_type, status, ST, ET, city, type, airline_logo
                             ) VALUES %s
-                        """, [
-                            (
-                                r["flight_number"],
-                                r["scheduled_date"],
-                                r["scraped_at"],
-                                r["is_changed"],
-                                r["status"],
-                                r["ST"],
-                                r["ET"],
-                                r["city"],
-                                r["type"],
-                                r["airline_logo"]
-                            ) for r in snapshot_rows
-                        ])
+                        """, snapshot_rows)
                     except Exception as e:
-                        log(f"SNAPSHOT INSERT FAILED: {e}")
+                        log(f"  [ERROR] Snapshot insert failed: {e}")
                         conn.rollback()
                         raise
 
-                # Mark any flights missing from this fetch as Dropped
-                mark_dropped_flights(cursor, conn, date_str, tag, seen_flight_numbers, fetched_at)
+                # --- Check for silently dropped flights ---
+                mark_dropped_flights(cursor, date_str, tag, seen_flight_numbers, fetched_at)
 
-                log(f"{changed_count} flights changed for {tag} {date_str}")
+                log(f"  {changed_count} changes recorded")
                 conn.commit()
+
+        # --- Update freshness timestamp ---
+        update_scraper_status(cursor)
+
+        # --- Clean up old data ---
+        cleanup_old_data(cursor)
+
+        conn.commit()
+        log("\n✅ Scrape complete")
 
     finally:
         cursor.close()
         conn.close()
         log("DB connection closed.")
+
 
 if __name__ == "__main__":
     main()
