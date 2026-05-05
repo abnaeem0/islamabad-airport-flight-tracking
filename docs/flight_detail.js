@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ===== DOM REFS =====
-  const toggleAllCheckbox = document.getElementById('toggle-all');
+  
   const lastRefreshedEl   = document.getElementById('last-refreshed');
   const tbody             = document.querySelector('#snapshot-table tbody');
 
@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await fetchFreshness();
 
   // Checkbox no longer needed (we only store changes now) but kept for compatibility
-  toggleAllCheckbox.addEventListener('change', fetchAndRender);
+  //toggleAllCheckbox.addEventListener('change', fetchAndRender);
 
   // Auto-refresh every 5 minutes
   setInterval(async () => {
