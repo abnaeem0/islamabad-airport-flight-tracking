@@ -836,13 +836,15 @@ p.error {
     width: 100%;
   }
 
-  #city-filter-wrap {
-    flex-direction: column;
-    align-items: flex-start;
+ #city-filter-wrap {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
   }
 
-  #city-filter-wrap select {
-    width: 100%;
+   #city-filter-wrap .filter-label {
+    font-size: 0.65rem;
+    white-space: nowrap;
   }
 
   .flight-card {
