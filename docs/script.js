@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const historyList     = document.getElementById('history-list');
   const dateInput       = document.getElementById('flight-date');
   const citySelect      = document.getElementById('city-filter');
+  const cityFilterWrap  = document.getElementById('city-filter-wrap');
   const natureSelect    = document.getElementById('nature-filter');
   const clearHistoryBtn = document.getElementById('clear-history-btn');
 
@@ -36,6 +37,13 @@ document.addEventListener('DOMContentLoaded', () => {
   floatBtn.addEventListener('click', () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
+
+  // Auto-search when type or nature filter changes (city is post-search only)
+  document.getElementById('flight-type').addEventListener('change', () => searchBtn.click());
+  document.getElementById('nature-filter').addEventListener('change', () => searchBtn.click());
+
+  // Auto-search when city filter changes (only relevant after first search)
+  citySelect.addEventListener('change', () => searchBtn.click());
 
   // --- Utility ---
   function timeToMinutes(t) {
@@ -75,25 +83,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    searchBtn.disabled  = true;
+    searchBtn.disabled    = true;
     searchBtn.textContent = 'Searching...';
     resultsDiv.innerHTML  = '<p>Loading...</p>';
 
     try {
       let queryBuilder = client.from('flights').select('*').eq('scheduled_date', date);
-
-      // Search by normalised flight number (spaces stripped from DB value too)
-      if (query) queryBuilder = queryBuilder.ilike('flight_number', `%${query}%`);
-      if (typeFilter) queryBuilder = queryBuilder.eq('type', typeFilter);
+      if (query)        queryBuilder = queryBuilder.ilike('flight_number', `%${query}%`);
+      if (typeFilter)   queryBuilder = queryBuilder.eq('type', typeFilter);
       if (natureFilter) queryBuilder = queryBuilder.eq('nature', natureFilter);
 
       const { data: flights, error } = await queryBuilder;
       if (error) throw error;
 
-      // Always repopulate city dropdown from full results (preserving selection)
+      // Populate city filter above results and show it
       const cities = [...new Set(flights.map(f => f.city).filter(Boolean))].sort();
       citySelect.innerHTML = '<option value="">All Cities</option>' +
         cities.map(c => `<option value="${c}" ${c === cityFilter ? 'selected' : ''}>${c}</option>`).join('');
+      cityFilterWrap.style.display = cities.length ? 'flex' : 'none';
 
       // Apply city filter client-side so dropdown stays intact
       const filtered = cityFilter
@@ -114,10 +121,10 @@ document.addEventListener('DOMContentLoaded', () => {
         card.className = 'flight-card';
 
         const img = document.createElement('img');
-        img.src    = getLogoUrl(f.flight_number);
-        img.alt    = f.flight_number + ' logo';
-        img.width  = 40;
-        img.height = 40;
+        img.src     = getLogoUrl(f.flight_number);
+        img.alt     = f.flight_number + ' logo';
+        img.width   = 40;
+        img.height  = 40;
         img.onerror = function() { this.style.display = 'none'; };
 
         const info = document.createElement('div');
@@ -137,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsDiv.appendChild(card);
       });
 
-      // Save to history — always, whether flight number typed or date-only search
+      // Save to history
       const label = query
         ? query
         : `${date}${typeFilter ? ' · ' + typeFilter + 's' : ''}${natureFilter ? ' · ' + natureFilter : ''}`;
@@ -148,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
       resultsDiv.innerHTML = '<p class="error">Error fetching flights. Please try again.</p>';
     } finally {
       searchBtn.disabled    = false;
-      searchBtn.textContent = 'Search';
+      searchBtn.textContent = 'Search Flights';
     }
   });
 
@@ -183,19 +190,18 @@ document.addEventListener('DOMContentLoaded', () => {
     history.forEach((h, index) => {
       const li = document.createElement('li');
 
-      // Left side: flight label + optional user label
       const labelWrap = document.createElement('div');
       labelWrap.className = 'history-label-wrap';
 
       const span = document.createElement('span');
-      span.className   = 'history-flight';
-      span.textContent = h.label + (h.date && h.isFlightSearch ? ` | ${h.date}` : '');
+      span.className    = 'history-flight';
+      span.textContent  = h.label + (h.date && h.isFlightSearch ? ` | ${h.date}` : '');
       span.style.cursor = 'pointer';
       span.addEventListener('click', () => loadFlight(h.label, h.date, h.isFlightSearch));
 
       const userLabelEl = document.createElement('span');
-      userLabelEl.className   = 'history-user-label';
-      userLabelEl.textContent = h.userLabel || '+ add label';
+      userLabelEl.className    = 'history-user-label';
+      userLabelEl.textContent  = h.userLabel || '+ add label';
       userLabelEl.style.cursor = 'pointer';
       userLabelEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -205,7 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
       labelWrap.appendChild(span);
       labelWrap.appendChild(userLabelEl);
 
-      // Right side: reorder + delete buttons
       const btnDiv = document.createElement('div');
       btnDiv.className = 'history-buttons';
 
@@ -290,13 +295,13 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       document.getElementById('flight-search').value = '';
       const typeSelect = document.getElementById('flight-type');
-      if (label.includes('· Arrivals'))   typeSelect.value = 'Arrival';
+      if (label.includes('· Arrivals'))        typeSelect.value = 'Arrival';
       else if (label.includes('· Departures')) typeSelect.value = 'Departure';
-      else typeSelect.value = '';
+      else                                      typeSelect.value = '';
       if (natureSelect) {
-        if (label.includes('· International')) natureSelect.value = 'International';
-        else if (label.includes('· Domestic')) natureSelect.value = 'Domestic';
-        else natureSelect.value = '';
+        if (label.includes('· International'))      natureSelect.value = 'International';
+        else if (label.includes('· Domestic'))      natureSelect.value = 'Domestic';
+        else                                         natureSelect.value = '';
       }
     }
     dateInput.value = date;
