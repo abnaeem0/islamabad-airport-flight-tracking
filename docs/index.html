@@ -16,10 +16,9 @@
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-F5WJZW6DMV');
 </script>
-  
+
 <body>
   <header class="site-header">
     <div class="nav-container">
@@ -31,8 +30,9 @@
       </nav>
     </div>
   </header>
+
   <h1>Islamabad Flight Tracker</h1>
-  
+
   <section class="seo-content">
     <h2>Islamabad International Airport Flight Information</h2>
     <p>
@@ -43,48 +43,56 @@
       This tool provides up-to-date flight data for travelers and visitors.
     </p>
   </section>
-  
-  <div id="search-container">
-    <input type="text" id="flight-search" placeholder="Enter flight number or airline">
-    <input type="date" id="flight-date">
-    
-    <select id="flight-type">
-      <option value="">All</option>
-      <option value="Arrival">Arrival</option>
-      <option value="Departure">Departure</option>
-    </select>
 
-    <select id="nature-filter">
-      <option value="">All</option>
-      <option value="International">International</option>
-      <option value="Domestic">Domestic</option>
-    </select>
-    
-    <select id="city-filter">
-      <option value="">All Cities</option>
-      <!-- Will populate dynamically from available flights -->
-    </select>
-    <button id="search-btn">Search</button>
+  <!-- Search bar — flight number, date, type, and route filters -->
+  <div id="search-container">
+
+    <input type="text" id="flight-search" placeholder="Flight number or airline (optional)">
+    <input type="date" id="flight-date">
+
+    <div class="filter-group">
+      <label class="filter-label" for="flight-type">Type</label>
+      <select id="flight-type">
+        <option value="">All</option>
+        <option value="Arrival">Arrivals</option>
+        <option value="Departure">Departures</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label class="filter-label" for="nature-filter">Route</label>
+      <select id="nature-filter">
+        <option value="">All</option>
+        <option value="International">International</option>
+        <option value="Domestic">Domestic</option>
+      </select>
+    </div>
+
+    <button id="search-btn">Search Flights</button>
   </div>
 
+  <p class="search-hint">Select a date and press <strong>Search Flights</strong>. Filter results by city after searching.</p>
+
   <a href="#local-history" id="jump-to-history">View Recent Searches ↓</a>
-  
+
+  <!-- City filter appears here after search, above results -->
+  <div id="city-filter-wrap" style="display:none;">
+    <label class="filter-label" for="city-filter">Filter by City</label>
+    <select id="city-filter">
+      <option value="">All Cities</option>
+    </select>
+  </div>
+
   <div id="search-results"></div>
 
   <div id="local-history">
     <h3>Recent Searches</h3>
     <button id="clear-history-btn">Clear History</button>
-
-    <ul id="history-list">
-        <!-- JS will populate this with <li> elements containing up/down buttons -->  
-    </ul>
+    <ul id="history-list"></ul>
   </div>
 
-  <!-- Load Supabase FIRST -->
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  
-
-  <!-- Then your script -->
+  <!-- Load Supabase FIRST (no defer), then our script -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="script.js" defer></script>
 
   <footer class="site-footer">
@@ -95,6 +103,5 @@
       <a href="contact.html">Contact</a>
     </nav>
   </footer>
-
 </body>
 </html>
