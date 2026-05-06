@@ -152,9 +152,8 @@ h1 {
 
 #search-container {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  justify-content: center;
+  flex-direction: column;
+  gap: 0.75rem;
   max-width: 900px;
   margin: 0 auto 1.5rem;
   padding: 1.5rem;
@@ -164,9 +163,32 @@ h1 {
   box-shadow: var(--shadow);
 }
 
+/* Two-column row inside search panel */
+.search-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Labelled field wrapper */
+.search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1 1 160px;
+}
+
+.search-field label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
 #search-container input,
 #search-container select {
-  flex: 1 1 160px;
+  width: 100%;
   padding: 0.65rem 0.9rem;
   font-family: 'Sora', sans-serif;
   font-size: 0.9rem;
@@ -196,6 +218,14 @@ h1 {
 #search-container select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* Hint text below search button */
+.search-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 0.1rem;
 }
 
 #search-btn {
@@ -302,8 +332,8 @@ p.error {
 }
 
 .flight-card img {
-  width: 64px;
-  height: 64px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
   border-radius: 6px;
   background: var(--surface-2);
@@ -697,6 +727,54 @@ p.error {
   opacity: 0.7;
 }
 
+
+/* =========================
+   City Filter (post-search)
+========================= */
+
+#city-filter-wrap {
+  max-width: 900px;
+  margin: 0 auto 1rem;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+#city-filter-wrap label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+#city-filter-wrap select {
+  flex: 1 1 200px;
+  padding: 0.55rem 2rem 0.55rem 0.9rem;
+  font-family: 'Sora', sans-serif;
+  font-size: 0.88rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#city-filter-wrap select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
 /* =========================
    Footer
 ========================= */
@@ -737,15 +815,28 @@ p.error {
 @media (max-width: 600px) {
   #search-container {
     padding: 1rem;
-    gap: 0.5rem;
+    gap: 0.6rem;
   }
 
-  #search-container input,
-  #search-container select {
+  .search-row {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .search-field {
     flex: 1 1 100%;
   }
 
   #search-btn {
+    width: 100%;
+  }
+
+  #city-filter-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #city-filter-wrap select {
     width: 100%;
   }
 
@@ -758,14 +849,94 @@ p.error {
     width: 100%;
   }
 }
-.flight-nature {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 0.1rem 0.45rem;
-  border-radius: 4px;
-  margin-left: 0.4rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+
+/* =========================
+   Filter Group Labels
+========================= */
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1 1 140px;
 }
-.flight-nature.international { background: rgba(59,130,246,0.15); color: #60a5fa; }
-.flight-nature.domestic       { background: rgba(16,185,129,0.15); color: #34d399; }
+
+.filter-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding-left: 0.1rem;
+}
+
+/* =========================
+   Search Hint
+========================= */
+
+.search-hint {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: -0.75rem auto 1rem;
+  max-width: 900px;
+  padding: 0 1rem;
+}
+
+.search-hint strong {
+  color: var(--text);
+}
+
+/* =========================
+   City Filter (post-search)
+========================= */
+
+#city-filter-wrap {
+  max-width: 900px;
+  margin: 0 auto 0.75rem;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+#city-filter-wrap .filter-label {
+  white-space: nowrap;
+}
+
+#city-filter-wrap select {
+  flex: 1 1 200px;
+  padding: 0.55rem 0.9rem;
+  font-family: 'Sora', sans-serif;
+  font-size: 0.88rem;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#city-filter-wrap select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+@media (max-width: 600px) {
+  #city-filter-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #city-filter-wrap select {
+    width: 100%;
+  }
+}
