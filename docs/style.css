@@ -155,7 +155,7 @@ h1 {
   flex-direction: column;
   gap: 0.75rem;
   max-width: 900px;
-  margin: 0 auto 1.5rem;
+  margin: 0 auto 0.5rem;
   padding: 1.5rem;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -220,13 +220,7 @@ h1 {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-/* Hint text below search button */
-.search-hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-align: center;
-  margin-top: 0.1rem;
-}
+
 
 #search-btn {
   flex: 0 0 auto;
@@ -267,7 +261,7 @@ h1 {
 #jump-to-history {
   display: block;
   text-align: center;
-  margin: 0 auto 1.5rem;
+  margin: 0 auto 0.5rem;
   font-size: 0.85rem;
   color: var(--text-muted);
   text-decoration: none;
@@ -878,7 +872,7 @@ p.error {
   text-align: center;
   font-size: 0.8rem;
   color: var(--text-muted);
-  margin: -0.75rem auto 1rem;
+  margin: 0rem auto 0.3rem;
   max-width: 900px;
   padding: 0 1rem;
 }
