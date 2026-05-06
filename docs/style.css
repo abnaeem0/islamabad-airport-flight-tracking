@@ -940,3 +940,13 @@ p.error {
     width: 100%;
   }
 }
+
+.filter-row {
+  display: flex;
+  gap: 0.6rem;
+  flex: 1 1 300px;
+}
+
+.filter-row .filter-group {
+  flex: 1;
+}
