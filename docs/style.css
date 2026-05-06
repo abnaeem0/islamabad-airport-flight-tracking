@@ -858,7 +858,7 @@ p.error {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  flex: 1 1 140px;
+  flex: 0 1 160px;
 }
 
 .filter-label {
