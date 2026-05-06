@@ -938,7 +938,7 @@ p.error {
 .filter-row {
   display: flex;
   gap: 0.6rem;
-  flex: 1 1 300px;
+  flex-wrap: wrap;
 }
 
 .filter-row .filter-group {
