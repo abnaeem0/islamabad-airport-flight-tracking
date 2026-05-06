@@ -50,23 +50,25 @@
     <input type="text" id="flight-search" placeholder="Flight number or airline (optional)">
     <input type="date" id="flight-date">
 
-    <div class="filter-group">
-      <label class="filter-label" for="flight-type">Type</label>
-      <select id="flight-type">
-        <option value="">All</option>
-        <option value="Arrival">Arrivals</option>
-        <option value="Departure">Departures</option>
-      </select>
-    </div>
-
-    <div class="filter-group">
-      <label class="filter-label" for="nature-filter">Route</label>
-      <select id="nature-filter">
-        <option value="">All</option>
-        <option value="International">International</option>
-        <option value="Domestic">Domestic</option>
-      </select>
-    </div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label class="filter-label" for="flight-type">Type</label>
+        <select id="flight-type">
+          <option value="">All</option>
+          <option value="Arrival">Arrivals</option>
+          <option value="Departure">Departures</option>
+        </select>
+      </div>
+  
+      <div class="filter-group">
+        <label class="filter-label" for="nature-filter">Route</label>
+        <select id="nature-filter">
+          <option value="">All</option>
+          <option value="International">International</option>
+          <option value="Domestic">Domestic</option>
+        </select>
+      </div>
+   </div> 
 
     <button id="search-btn">Search Flights</button>
   </div>
