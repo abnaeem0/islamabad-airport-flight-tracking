@@ -149,7 +149,7 @@ def mark_dropped_flights(cursor, date_str, tag, seen_flight_numbers, fetched_at)
         WHERE scheduled_date = %s
           AND type = %s
           AND flight_number != ALL(%s)
-          AND (status IS NULL OR status NOT ILIKE ALL(%s))
+          AND (status IS NULL OR status != ALL(%s))
     """, (
         date_str,
         tag,
