@@ -1,23 +1,25 @@
 # .github/workflows/origin_scraper.yml
 #
-# Runs origin_scraper.py every 15 minutes.
-# Uses the same DB secrets as the original scraper workflow —
-# no new secrets needed.
+# Runs origin_scraper.py on demand until confirmed stable,
+# then add the schedule trigger below.
 #
-# Kept completely separate from scraper.yml so either can be
-# paused, modified, or debugged independently.
+# Uses the same DB secrets as the original scraper — no new secrets needed.
+# Completely independent of scraper.yml.
 
 name: Origin Scraper
 
 on:
-
-  # Allow manual trigger from the Actions tab for testing
+  # Manual trigger only for now — add cron once confirmed stable
   workflow_dispatch:
+
+  # Uncomment this block once you've confirmed a clean manual run:
+  # schedule:
+  #   - cron: "0,15,30,45 * * * *"
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 14       # hard stop if something hangs
+    timeout-minutes: 22      # 6 airports concurrent ~4-5 min expected, 22 is safe headroom
 
     steps:
       - name: Checkout repository
