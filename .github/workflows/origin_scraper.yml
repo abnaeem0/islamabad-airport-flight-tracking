@@ -10,9 +10,6 @@
 name: Origin Scraper
 
 on:
-  schedule:
-    # Every 15 minutes
-    - cron: "0,15,30,45 * * * *"
 
   # Allow manual trigger from the Actions tab for testing
   workflow_dispatch:
@@ -20,7 +17,7 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 10       # hard stop if something hangs
+    timeout-minutes: 14       # hard stop if something hangs
 
     steps:
       - name: Checkout repository
