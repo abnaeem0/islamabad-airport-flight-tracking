@@ -1,0 +1,171 @@
+-- =============================================================================
+--  REFERENCE QUERIES
+--  Useful queries for working with the origin tracking system.
+--  None of these touch the original flights / flight_snapshots tables.
+-- =============================================================================
+
+
+-- -----------------------------------------------------------------------------
+--  CANONICAL VIEW — what to query from the frontend
+--  One row per flight, best available source for each leg.
+-- -----------------------------------------------------------------------------
+
+-- All flights for a specific date
+SELECT *
+FROM flight_canonical_view
+WHERE scheduled_date = '2024-01-15'
+ORDER BY COALESCE(origin_ST, dest_ST);
+
+-- A specific flight across all dates
+SELECT *
+FROM flight_canonical_view
+WHERE flight_number = 'PK301'
+ORDER BY scheduled_date DESC;
+
+-- All flights between two specific airports on a date
+SELECT *
+FROM flight_canonical_view
+WHERE scheduled_date  = CURRENT_DATE
+  AND origin_airport  = 'Karachi'
+  AND dest_airport    = 'Islamabad';
+
+-- Flights currently delayed (either leg)
+SELECT *
+FROM flight_canonical_view
+WHERE scheduled_date = CURRENT_DATE
+  AND (origin_status ILIKE '%delay%' OR dest_status ILIKE '%delay%');
+
+
+-- -----------------------------------------------------------------------------
+--  RAW DATA — per source, per airport
+-- -----------------------------------------------------------------------------
+
+-- All PAA data for Karachi departures today
+SELECT *
+FROM origin_flights
+WHERE source_airport = 'Karachi'
+  AND type           = 'Departure'
+  AND scheduled_date = CURRENT_DATE
+  AND data_source    = 'paa'
+ORDER BY ST;
+
+-- Compare two sources for the same flight
+SELECT data_source, source_airport, type, status, ST, ET, last_checked
+FROM origin_flights
+WHERE flight_number  = 'PK301'
+  AND scheduled_date = CURRENT_DATE
+ORDER BY data_source, type;
+
+
+-- -----------------------------------------------------------------------------
+--  CHANGE HISTORY — for the timeline/log panel on the flight detail page
+-- -----------------------------------------------------------------------------
+
+-- Full change log for a flight on a specific date, newest first
+SELECT
+    scraped_at,
+    source_airport,
+    data_source,
+    type,
+    change_type,
+    status,
+    ST,
+    ET,
+    city
+FROM origin_snapshots
+WHERE flight_number  = 'PK301'
+  AND scheduled_date = '2024-01-15'
+ORDER BY scraped_at DESC;
+
+-- Status changes only (filters out time-only updates)
+SELECT *
+FROM origin_snapshots
+WHERE flight_number  = 'PK301'
+  AND scheduled_date = '2024-01-15'
+  AND change_type    = 'status_change'
+ORDER BY scraped_at DESC;
+
+-- How many changes were recorded per airport today (scraper health check)
+SELECT source_airport, data_source, COUNT(*) AS snapshot_count
+FROM origin_snapshots
+WHERE scheduled_date = CURRENT_DATE
+GROUP BY source_airport, data_source
+ORDER BY source_airport;
+
+
+-- -----------------------------------------------------------------------------
+--  SCRAPER HEALTH
+-- -----------------------------------------------------------------------------
+
+-- When did each scraper last run?
+SELECT scraper_id, last_run,
+       NOW() - last_run AS time_since_last_run
+FROM origin_scraper_status
+ORDER BY last_run DESC;
+
+-- Which airports have stale data (not updated in the last 20 minutes)?
+SELECT source_airport, data_source, MAX(last_checked) AS last_seen
+FROM origin_flights
+WHERE scheduled_date = CURRENT_DATE
+GROUP BY source_airport, data_source
+HAVING MAX(last_checked) < NOW() - INTERVAL '20 minutes'
+ORDER BY last_seen;
+
+
+-- -----------------------------------------------------------------------------
+--  FUTURE: ADDING A NEW DATA SOURCE
+--
+--  When you're ready to add ADS-B or an airline website scrape:
+--
+--  1. Register the new source (one row):
+INSERT INTO source_priority (data_source, priority, description)
+VALUES ('adsb', 30, 'ADS-B transponder ping');
+
+--  2. Write the new scraper to use:
+--       DATA_SOURCE = "adsb"
+--     and write to origin_flights / origin_snapshots exactly like this scraper does.
+--
+--  3. The canonical view automatically picks up the new source based on priority.
+--     No view changes, no schema changes.
+
+
+-- -----------------------------------------------------------------------------
+--  FUTURE: FOLDING IN THE ORIGINAL ISLAMABAD SCRAPER DATA
+--
+--  When you're confident in the new system and want a single source of truth:
+--
+--  1. Backfill historical data from the original flights table:
+INSERT INTO origin_flights (
+    flight_number, scheduled_date, type, source_airport, data_source,
+    city, airline_logo, status, ST, ET, nature, last_checked, last_updated
+)
+SELECT
+    flight_number, scheduled_date, type,
+    'Islamabad'   AS source_airport,
+    'paa'         AS data_source,
+    city, airline_logo, status, ST, ET, nature, last_checked, last_updated
+FROM flights
+ON CONFLICT DO NOTHING;
+
+--  2. Backfill snapshots:
+INSERT INTO origin_snapshots (
+    flight_number, scheduled_date, source_airport, data_source, type,
+    scraped_at, is_changed, change_type,
+    status, ST, ET, city, airline_logo, nature
+)
+SELECT
+    flight_number, scheduled_date,
+    'Islamabad'   AS source_airport,
+    'paa'         AS data_source,
+    type,
+    scraped_at, is_changed, change_type,
+    status, ST, ET, city, airline_logo, nature
+FROM flight_snapshots
+ON CONFLICT DO NOTHING;
+
+--  3. origin_scraper.py already includes Islamabad in WATCH_AIRPORTS,
+--     so from this point forward it's the single writer for ISB data too.
+--
+--  4. The original scraper.py can be left running as a fallback
+--     or disabled — your choice. It never interferes.
+-- -----------------------------------------------------------------------------
