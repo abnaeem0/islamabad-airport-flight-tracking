@@ -1,0 +1,44 @@
+# .github/workflows/origin_scraper.yml
+#
+# Runs origin_scraper.py every 15 minutes.
+# Uses the same DB secrets as the original scraper workflow —
+# no new secrets needed.
+#
+# Kept completely separate from scraper.yml so either can be
+# paused, modified, or debugged independently.
+
+name: Origin Scraper
+
+on:
+  schedule:
+    # Every 15 minutes
+    - cron: "0,15,30,45 * * * *"
+
+  # Allow manual trigger from the Actions tab for testing
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10       # hard stop if something hangs
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests psycopg2-binary urllib3
+
+      - name: Run origin scraper
+        env:
+          DB_HOST:     ${{ secrets.DB_HOST }}
+          DB_NAME:     ${{ secrets.DB_NAME }}
+          DB_USER:     ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_PORT:     ${{ secrets.DB_PORT }}
+        run: python origin_scraper.py
