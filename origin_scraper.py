@@ -177,7 +177,7 @@ def flatten_flight(
         return None
 
     return {
-        "flight_number":  flight_number.replace(" ", ""),   # "TK 571" → "TK571"
+        "flight_number":  flight_number.replace(" ", "").replace("-", ""),   # "TK 571" → "TK571"
         "scheduled_date": date_str,
         "type":           flight_type,
         "source_airport": source_airport,
