@@ -17,8 +17,10 @@ Key design decisions:
   - data_source = "paa" for all records from this scraper
   - Future scrapers (ADS-B, airline websites) write to the same tables
     with a different data_source — no schema changes needed
-
-Run: manually from GitHub Actions until confirmed stable, then add cron.
+  - origin_city and destination_city are always stored explicitly so the
+    canonical view join is unambiguous regardless of flight type
+  - Flight numbers are normalised (spaces and hyphens stripped) so
+    "9P-670", "9P 670", and "9P670" all match correctly across airports
 """
 
 import os
@@ -60,15 +62,14 @@ PAA_TEMPLATE = "https://paaconnectapi.paa.gov.pk/api/flights/{date}/{type}/{city
 # Statuses that mean a flight is finished — skip re-snapshotting these
 TERMINAL_STATUSES = ("Dropped", "Cancelled", "Landed", "Departed")
 
-# Days relative to today to scrape (-1 = yesterday, 0 = today, 1 = tomorrow)
-DAY_OFFSETS = [-1, 0, 1]
+# Days relative to today to scrape (0 = today, 1 = tomorrow)
+DAY_OFFSETS = [0, 1]
 
-# Max concurrent API calls.
-# One worker per airport — enough to parallelise without hammering PAA.
+# Max concurrent API calls — one per airport avoids hammering PAA
 FETCH_WORKERS = 6
 
-# Request timeouts: (connect_timeout, read_timeout) in seconds.
-# Tuple form fails fast on a stalled connection instead of hanging silently.
+# Request timeouts: (connect_timeout, read_timeout) in seconds
+# Tuple form fails fast on stalled connections instead of hanging silently
 REQUEST_TIMEOUT = (5, 15)
 
 # DB credentials from environment variables — never hardcoded
@@ -86,7 +87,7 @@ DB_PORT     = int(os.environ.get("DB_PORT", 5432))
 def log(msg: str) -> None:
     """Timestamped stdout log — visible in GitHub Actions live log."""
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts}] {msg}", flush=True)   # flush=True ensures lines appear immediately in Actions
+    print(f"[{ts}] {msg}", flush=True)
 
 
 # ==============================================================================
@@ -125,10 +126,8 @@ def fetch_all(dates: list[str]) -> list[tuple]:
     Fire all (date, type, airport) fetch jobs concurrently and collect results.
 
     Returns:
-        List of (date_str, flight_type, city, raw_flights) tuples,
-        in completion order (not submission order — doesn't matter for writes).
+        List of (date_str, flight_type, city, raw_flights) tuples.
     """
-    # Build every combination upfront
     jobs = [
         (date_str, flight_type, airport)
         for date_str    in dates
@@ -156,6 +155,15 @@ def fetch_all(dates: list[str]) -> list[tuple]:
 #   PHASE 2 — PROCESS & WRITE (runs sequentially in main thread)
 # ==============================================================================
 
+def normalise_flight_number(raw: str) -> str:
+    """
+    Normalise flight number by stripping spaces and hyphens so that
+    "9P-670", "9P 670", and "9P670" all become "9P670" and match
+    correctly across different airports' feeds.
+    """
+    return raw.replace(" ", "").replace("-", "")
+
+
 def flatten_flight(
     raw: dict,
     flight_type: str,
@@ -166,9 +174,9 @@ def flatten_flight(
     """
     Convert a raw PAA API dict into a flat dict ready for DB insertion.
 
-    PAA returns the "other end" of the route differently per type:
-      Arrival   → EnglishFromCity (where it came from)
-      Departure → EnglishToCity   (where it is going)
+    Both origin_city and destination_city are always stored explicitly
+    regardless of flight type — this makes the canonical view join
+    unambiguous and the data self-explanatory.
 
     Returns None if the record has no flight number (unusable).
     """
@@ -177,27 +185,29 @@ def flatten_flight(
         return None
 
     return {
-        "flight_number":  flight_number.replace(" ", "").replace("-", ""),   # "TK 571" → "TK571"
-        "scheduled_date": date_str,
-        "type":           flight_type,
-        "source_airport": source_airport,
-        "data_source":    DATA_SOURCE,
-        "city":           raw.get("EnglishFromCity") if flight_type == "Arrival" else raw.get("EnglishToCity"),
-        "airline_logo":   raw.get("Logo"),
-        "status":         raw.get("EnglishRemarks"),
-        "ST":             raw.get("ST"),
-        "ET":             raw.get("ET"),
-        "nature":         raw.get("Nature"),
-        "last_checked":   fetched_at,
-        "last_updated":   raw.get("DateUpdated"),
+        "flight_number":    normalise_flight_number(flight_number),
+        "scheduled_date":   date_str,
+        "type":             flight_type,
+        "source_airport":   source_airport,
+        "data_source":      DATA_SOURCE,
+        "origin_city":      raw.get("EnglishFromCity"),   # always the departure city
+        "destination_city": raw.get("EnglishToCity"),     # always the arrival city
+        "airline_logo":     raw.get("Logo"),
+        "status":           raw.get("EnglishRemarks"),
+        "ST":               raw.get("ST"),
+        "ET":               raw.get("ET"),
+        "nature":           raw.get("Nature"),
+        "last_checked":     fetched_at,
+        "last_updated":     raw.get("DateUpdated"),
     }
 
 
 def is_isb_relevant(flat: dict) -> bool:
     """Returns True if this flight has a leg to or from Islamabad."""
     return (
-        flat["source_airport"] == "Islamabad"
-        or flat["city"] == "Islamabad"
+        flat["source_airport"]   == "Islamabad"
+        or flat["origin_city"]      == "Islamabad"
+        or flat["destination_city"] == "Islamabad"
     )
 
 
@@ -206,7 +216,6 @@ def detect_change(existing: dict | None, flat: dict) -> tuple[bool, str | None]:
     Compare the current DB row against freshly fetched data.
 
     Returns (is_changed, change_type).
-
     change_type: "new" | "status_change" | "time_change" | "city_change" | None
     """
     if existing is None:
@@ -215,9 +224,24 @@ def detect_change(existing: dict | None, flat: dict) -> tuple[bool, str | None]:
         return True, "status_change"
     if existing["st"] != flat["ST"] or existing["et"] != flat["ET"]:
         return True, "time_change"
-    if existing["city"] != flat["city"]:
+    if existing["origin_city"] != flat["origin_city"] or existing["destination_city"] != flat["destination_city"]:
         return True, "city_change"
     return False, None
+
+
+def is_valid_drop(flat: dict, source_airport: str) -> bool:
+    """
+    Check whether a flight disappearing from a feed is a genuine drop.
+
+    A flight is only genuinely dropped if it makes sense for it to be at
+    this airport — i.e. the airport is either the origin or destination.
+    If neither, the flight was never really "at" this airport and its
+    disappearance from the feed should be ignored.
+    """
+    return (
+        flat["origin_city"]      == source_airport
+        or flat["destination_city"] == source_airport
+    )
 
 
 def mark_dropped_flights(
@@ -230,7 +254,8 @@ def mark_dropped_flights(
 ) -> None:
     """
     Mark flights that were in the DB but are no longer in the API response
-    as 'Dropped', unless they already reached a terminal status.
+    as 'Dropped', unless they already reached a terminal status or don't
+    genuinely belong to this airport.
 
     Skipped entirely if the API returned zero flights (likely a failed fetch).
     """
@@ -238,8 +263,9 @@ def mark_dropped_flights(
         log(f"  [DROP]  Skipping — 0 flights returned for {flight_type} | {source_airport} | {date_str}")
         return
 
+    # Find DB rows for this batch missing from the current API response
     cursor.execute("""
-        SELECT flight_number
+        SELECT flight_number, origin_city, destination_city
         FROM origin_flights
         WHERE scheduled_date  = %s
           AND type            = %s
@@ -252,7 +278,15 @@ def mark_dropped_flights(
         list(seen_flight_numbers), list(TERMINAL_STATUSES),
     ))
 
-    dropped = [row["flight_number"] for row in cursor.fetchall()]
+    rows = cursor.fetchall()
+
+    # Only drop flights that genuinely belong to this airport
+    dropped = [
+        row["flight_number"] for row in rows
+        if row["origin_city"] == source_airport
+        or row["destination_city"] == source_airport
+    ]
+
     if not dropped:
         return
 
@@ -270,12 +304,12 @@ def mark_dropped_flights(
         INSERT INTO origin_snapshots (
             flight_number, scheduled_date, source_airport, data_source, type,
             scraped_at, is_changed, change_type,
-            status, ST, ET, city, airline_logo, nature
+            status, ST, ET, origin_city, destination_city, airline_logo, nature
         ) VALUES %s
     """, [
         (fn, date_str, source_airport, DATA_SOURCE, flight_type,
          fetched_at, True, "dropped",
-         "Dropped", None, None, None, None, None)
+         "Dropped", None, None, None, None, None, None)
         for fn in dropped
     ])
 
@@ -291,15 +325,7 @@ def process_batch(
     Process and write one (date, type, airport) batch to the DB.
     Runs in the main thread — no concurrent DB access.
 
-    Steps:
-      1. Flatten and optionally filter each raw flight
-      2. Detect changes against existing DB rows
-      3. Upsert into origin_flights
-      4. Batch-insert snapshots for changed flights only
-      5. Mark silently dropped flights
-
-    Returns:
-        Number of changes recorded.
+    Returns number of changes recorded.
     """
     fetched_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
@@ -322,7 +348,7 @@ def process_batch(
 
         # Check existing row
         cursor.execute("""
-            SELECT city, status, st, et
+            SELECT origin_city, destination_city, status, st, et
             FROM origin_flights
             WHERE flight_number  = %(flight_number)s
               AND scheduled_date = %(scheduled_date)s
@@ -334,30 +360,34 @@ def process_batch(
 
         is_changed, change_type = detect_change(existing, flat)
 
-        # Upsert current state — last_updated only advances on meaningful changes
+        # Upsert current state
+        # last_updated only advances when a meaningful field actually changed
         cursor.execute("""
             INSERT INTO origin_flights (
                 flight_number, scheduled_date, type, source_airport, data_source,
-                city, airline_logo, status, ST, ET, nature, last_checked, last_updated
+                origin_city, destination_city, airline_logo, status, ST, ET,
+                nature, last_checked, last_updated
             ) VALUES (
                 %(flight_number)s, %(scheduled_date)s, %(type)s, %(source_airport)s, %(data_source)s,
-                %(city)s, %(airline_logo)s, %(status)s, %(ST)s, %(ET)s, %(nature)s,
-                %(last_checked)s, %(last_updated)s
+                %(origin_city)s, %(destination_city)s, %(airline_logo)s, %(status)s, %(ST)s, %(ET)s,
+                %(nature)s, %(last_checked)s, %(last_updated)s
             )
             ON CONFLICT (flight_number, scheduled_date, type, source_airport, data_source)
             DO UPDATE SET
-                city          = EXCLUDED.city,
-                airline_logo  = EXCLUDED.airline_logo,
-                status        = EXCLUDED.status,
-                ST            = EXCLUDED.ST,
-                ET            = EXCLUDED.ET,
-                nature        = EXCLUDED.nature,
-                last_checked  = EXCLUDED.last_checked,
-                last_updated  = CASE
-                    WHEN origin_flights.status IS DISTINCT FROM EXCLUDED.status
-                      OR origin_flights.ST     IS DISTINCT FROM EXCLUDED.ST
-                      OR origin_flights.ET     IS DISTINCT FROM EXCLUDED.ET
-                      OR origin_flights.city   IS DISTINCT FROM EXCLUDED.city
+                origin_city      = EXCLUDED.origin_city,
+                destination_city = EXCLUDED.destination_city,
+                airline_logo     = EXCLUDED.airline_logo,
+                status           = EXCLUDED.status,
+                ST               = EXCLUDED.ST,
+                ET               = EXCLUDED.ET,
+                nature           = EXCLUDED.nature,
+                last_checked     = EXCLUDED.last_checked,
+                last_updated     = CASE
+                    WHEN origin_flights.status           IS DISTINCT FROM EXCLUDED.status
+                      OR origin_flights.ST               IS DISTINCT FROM EXCLUDED.ST
+                      OR origin_flights.ET               IS DISTINCT FROM EXCLUDED.ET
+                      OR origin_flights.origin_city      IS DISTINCT FROM EXCLUDED.origin_city
+                      OR origin_flights.destination_city IS DISTINCT FROM EXCLUDED.destination_city
                     THEN EXCLUDED.last_updated
                     ELSE origin_flights.last_updated
                 END
@@ -370,7 +400,8 @@ def process_batch(
                 flat["source_airport"], flat["data_source"], flat["type"],
                 fetched_at, True, change_type,
                 flat["status"], flat["ST"], flat["ET"],
-                flat["city"], flat["airline_logo"], flat["nature"],
+                flat["origin_city"], flat["destination_city"],
+                flat["airline_logo"], flat["nature"],
             ))
 
     # Batch insert all snapshots for this batch at once
@@ -379,7 +410,7 @@ def process_batch(
             INSERT INTO origin_snapshots (
                 flight_number, scheduled_date, source_airport, data_source, type,
                 scraped_at, is_changed, change_type,
-                status, ST, ET, city, airline_logo, nature
+                status, ST, ET, origin_city, destination_city, airline_logo, nature
             ) VALUES %s
         """, snapshot_rows)
 
@@ -468,7 +499,7 @@ def main() -> None:
             except Exception as e:
                 log(f"  [ERROR] Batch failed: {e} — rolling back")
                 conn.rollback()
-                continue  # Don't let one bad batch stop the rest
+                continue
 
         log(f"\n[WRITE] Done. {total_changes} total changes across all batches.")
 
