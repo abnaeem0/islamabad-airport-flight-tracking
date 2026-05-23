@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     PF: {
       name:      'AirSial',
       contact:   '021-111-247-742',
-      statusUrl: 'https://www.airsial.com/flight-status',
+      statusUrl: 'https://www.airsial.com/manage-reservation',
       fsCode:    'PF',
       fsSuffix:  '*',
     },
