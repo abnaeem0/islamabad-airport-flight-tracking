@@ -193,31 +193,45 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const city      = latest.city || '—';
     const isArrival = (latest.type || '').toLowerCase() === 'arrival';
-    const route     = isArrival ? `${city} → ISB` : `ISB → ${city}`;
+    const route     = isArrival ? `${city} → Islamabad` : `Islamabad → ${city}`;
 
-    const dep     = latest.st || '—';
+    const dep     = latest.st ? `${latest.st} (${date})` : '—';
     const status  = latest.status || '—';
-    const lastUpd = formatPKT(latest.scraped_at).split(', ')[1] || '—';
-    const fsNum   = flightNumber.replace(/[^A-Za-z0-9]/g, '');
+    const lastUpd = formatPKT(latest.scraped_at); // full date + time in PKT
+
+    // FlightStats link: /flight-tracker/IATA/NUMBER?year=YYYY&month=M&date=D
+    const letters  = flightNumber.replace(/[^A-Za-z]/g, '');
+    const digits   = flightNumber.replace(/[^0-9]/g, '');
+    const [yr, mo, dy] = date.split('-');
+    const fsUrl = `https://www.flightstats.com/v2/flight-tracker/${letters}/${digits}?year=${yr}&month=${parseInt(mo)}&date=${parseInt(dy)}`;
+
     const pageUrl = window.location.href;
 
-    return [
+    const lines = [
       `✈️ Flight Update`,
       `Flight: ${flightNumber}`,
       `Route: ${route}`,
       `⏰ Departure: ${dep}`,
       `📊 Status: ${status}`,
-      `🕒 Last update: ${lastUpd}`,
+      `🕒 Last update: ${lastUpd} PKT`,
       `────────────────`,
       `🔎 Live verification:`,
-      `FlightStats: https://www.flightstats.com/v2/flight-tracker/search?flight=${fsNum}`,
-      `🏢 Airline status:`,
-      `${airline.name}: ${airline.statusUrl}`,
-      `📞 Helpline: ${airline.contact}`,
-      `────────────────`,
-      `📱 Live tracking:`,
-      pageUrl,
-    ].join('\n');
+      `FlightStats: ${fsUrl}`,
+    ];
+
+    if (airline.statusUrl && airline.statusUrl !== '#') {
+      lines.push(`🏢 Airline status:`);
+      lines.push(`${airline.name}: ${airline.statusUrl}`);
+    }
+    if (airline.contact && airline.contact !== 'N/A') {
+      lines.push(`📞 Helpline: ${airline.contact}`);
+    }
+
+    lines.push(`────────────────`);
+    lines.push(`🛫 Airport status check:`);
+    lines.push(pageUrl);
+
+    return lines.join('\n');
   }
 
   // Inject the Share button into #flight-info (called after header renders)
