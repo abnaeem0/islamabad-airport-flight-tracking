@@ -222,8 +222,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Inject the Share button into #flight-info (called after header renders)
   function injectShareButton(snapshots) {
-    if (document.getElementById('share-btn')) return; // already injected
-
     const btn = document.createElement('button');
     btn.id        = 'share-btn';
     btn.className = 'share-trigger-btn';
@@ -303,11 +301,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           <p id="flight-type">Type: ${display(first.type)}</p>
           <p id="flight-city">${first.type === 'Arrival' ? 'From' : 'To'}: ${display(first.city)}</p>
         `;
-        injectShareModal();
       }
 
-      // Always refresh the share button with latest snapshots
-      // (remove old btn so it gets re-injected with fresh data closure)
+      // Always ensure modal exists in DOM, then re-inject button with fresh snapshot closure
+      injectShareModal();
       const existingBtn = document.getElementById('share-btn');
       if (existingBtn) existingBtn.remove();
       injectShareButton(snapshots);
