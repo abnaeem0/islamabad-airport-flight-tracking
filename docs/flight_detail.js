@@ -26,24 +26,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       contact:   '111-786-786',
       statusUrl: 'https://www.piac.com.pk/travel-information/flight-status',
       fsCode:    'PK',
+      fsSuffix:  '',
     },
     PA: {
       name:      'AirBlue',
       contact:   '111-247-258',
       statusUrl: 'https://www.airblue.com/bookings/flight_status.aspx',
-      fsCode:    'PA',
+      fsCode:    'ABQ',
+      fsSuffix:  '',
     },
     '9P': {
       name:      'Fly Jinnah',
       contact:   '021-111-000-035',
       statusUrl: 'https://www.flyjinnah.com/en/help/flight-status',
       fsCode:    'FJL',
+      fsSuffix:  '',
     },
     PF: {
       name:      'AirSial',
       contact:   '021-111-247-742',
       statusUrl: 'https://www.airsial.com/flight-status',
       fsCode:    'PF',
+      fsSuffix:  '*',
     },
   };
 
@@ -63,7 +67,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ===== UTILS =====
 
   function formatPKT(dateStr) {
-    const utcDate = new Date(dateStr + 'Z');
+    const normalized = dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : dateStr + 'Z';
+    const utcDate = new Date(normalized);
     return utcDate.toLocaleString('en-GB', {
       timeZone:   'Asia/Karachi',
       year:       'numeric',
@@ -218,11 +223,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const status  = latest.status || '—';
     const lastUpd = lastScrapeTime ? formatPKT(lastScrapeTime) : formatPKT(latest.scraped_at);
 
-    // FlightStats link: uses airline-specific fsCode, not raw IATA letters
-    const digits   = flightNumber.replace(/[^0-9]/g, '');
-    const fsCode   = airline.fsCode || flightNumber.replace(/[^A-Za-z]/g, '');
+    // FlightStats link: strip the IATA prefix to get pure flight digits
+    // e.g. 9P734 -> prefix is '9P' (2 chars) -> digits '734'
+    //      PF125 -> prefix is 'PF' (2 chars) -> digits '125'
+    const iataKey  = AIRLINE_INFO[flightNumber.slice(0,2).toUpperCase()] ? 2 : 1;
+    const digits   = flightNumber.slice(iataKey).replace(/[^0-9]/g, '');
+    const fsCode   = airline.fsCode   || flightNumber.replace(/[^A-Za-z]/g, '');
+    const fsSuffix = airline.fsSuffix || '';
     const [yr, mo, dy] = date.split('-');
-    const fsUrl = `https://www.flightstats.com/v2/flight-tracker/${fsCode}/${digits}?year=${yr}&month=${parseInt(mo)}&date=${parseInt(dy)}`;
+    const fsUrl = `https://www.flightstats.com/v2/flight-tracker/${fsCode}${fsSuffix}/${digits}?year=${yr}&month=${parseInt(mo)}&date=${parseInt(dy)}`;
 
     const pageUrl = window.location.href;
 
