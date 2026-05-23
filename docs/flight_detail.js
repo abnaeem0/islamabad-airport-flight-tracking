@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     '9P': {
       name:      'Fly Jinnah',
       contact:   '021-111-000-035',
-      statusUrl: 'https://www.flyjinnah.com/en/help/flight-status',
+      statusUrl: 'https://www.flyjinnah.com/en/manage/flight-status/check-flight-status',
       fsCode:    'FJL',
       fsSuffix:  '',
     },
