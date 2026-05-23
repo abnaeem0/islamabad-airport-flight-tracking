@@ -24,26 +24,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     PK: {
       name:      'Pakistan Intl (PIA)',
       contact:   '111-786-786',
-      website:   'https://www.piac.com.pk',
-      statusUrl: 'https://book-pia.crane.aero/ibe/flightStatus?&tab=number',
+      statusUrl: 'https://www.piac.com.pk/travel-information/flight-status',
+      fsCode:    'PK',
     },
     PA: {
       name:      'AirBlue',
       contact:   '111-247-258',
-      website:   'https://www.airblue.com',
       statusUrl: 'https://www.airblue.com/bookings/flight_status.aspx',
+      fsCode:    'PA',
     },
     '9P': {
       name:      'Fly Jinnah',
       contact:   '021-111-000-035',
-      website:   'https://www.flyjinnah.com',
-      statusUrl: 'https://www.flyjinnah.com/en/manage/flight-status/check-flight-status',
+      statusUrl: 'https://www.flyjinnah.com/en/help/flight-status',
+      fsCode:    'FJL',
     },
     PF: {
       name:      'AirSial',
       contact:   '021-111-247-742',
-      website:   'https://www.airsial.com',
-      statusUrl: 'https://www.airsial.com/#plane_search',
+      statusUrl: 'https://www.airsial.com/flight-status',
+      fsCode:    'PF',
     },
   };
 
@@ -98,6 +98,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // ===== STATE =====
+  let lastScrapeTime = null;
+
   // ===== DOM REFS =====
   const lastRefreshedEl = document.getElementById('last-refreshed');
   const tbody           = document.querySelector('#snapshot-table tbody');
@@ -117,7 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <button id="share-modal-close" aria-label="Close">&times;</button>
         </div>
 
-        <pre id="share-text-preview"></pre>
+        <div id="share-text-preview" role="region" aria-label="Share message preview"></div>
 
         <div id="share-actions">
           <button id="share-copy-btn" class="share-btn share-btn--primary">
@@ -154,7 +157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Copy button
     document.getElementById('share-copy-btn').addEventListener('click', () => {
-      const text = document.getElementById('share-text-preview').textContent;
+      const text = document.getElementById('share-text-preview').innerText;
       navigator.clipboard.writeText(text).then(() => {
         const btn = document.getElementById('share-copy-btn');
         btn.textContent = '✅ Copied!';
@@ -170,13 +173,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       const number = '92' + raw.replace(/^0+/, '');
-      const text   = encodeURIComponent(document.getElementById('share-text-preview').textContent);
+      const text   = encodeURIComponent(document.getElementById('share-text-preview').innerText);
       window.open(`https://wa.me/${number}?text=${text}`, '_blank');
     });
   }
 
+  function renderPreview(text) {
+    const el = document.getElementById('share-text-preview');
+    // Linkify URLs, keep everything else as escaped text
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const html = text
+      .split('\n')
+      .map(line => {
+        const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return escaped.replace(urlRegex, url =>
+          `<a href="${url}" target="_blank" rel="noopener">${url}</a>`
+        );
+      })
+      .join('\n');
+    el.innerHTML = html;
+  }
+
   function openShareModal(text) {
-    document.getElementById('share-text-preview').textContent = text;
+    renderPreview(text);
     document.getElementById('share-modal').classList.add('share-modal--open');
     document.body.style.overflow = 'hidden';
   }
@@ -197,13 +216,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const dep     = latest.st ? `${latest.st} (${date})` : '—';
     const status  = latest.status || '—';
-    const lastUpd = formatPKT(latest.scraped_at); // full date + time in PKT
+    const lastUpd = lastScrapeTime ? formatPKT(lastScrapeTime) : formatPKT(latest.scraped_at);
 
-    // FlightStats link: /flight-tracker/IATA/NUMBER?year=YYYY&month=M&date=D
-    const letters  = flightNumber.replace(/[^A-Za-z]/g, '');
+    // FlightStats link: uses airline-specific fsCode, not raw IATA letters
     const digits   = flightNumber.replace(/[^0-9]/g, '');
+    const fsCode   = airline.fsCode || flightNumber.replace(/[^A-Za-z]/g, '');
     const [yr, mo, dy] = date.split('-');
-    const fsUrl = `https://www.flightstats.com/v2/flight-tracker/${letters}/${digits}?year=${yr}&month=${parseInt(mo)}&date=${parseInt(dy)}`;
+    const fsUrl = `https://www.flightstats.com/v2/flight-tracker/${fsCode}/${digits}?year=${yr}&month=${parseInt(mo)}&date=${parseInt(dy)}`;
 
     const pageUrl = window.location.href;
 
@@ -213,7 +232,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `Route: ${route}`,
       `⏰ Departure: ${dep}`,
       `📊 Status: ${status}`,
-      `🕒 Last update: ${lastUpd} PKT`,
+      `🕒 Last scraped: ${lastUpd} PKT`,
       `────────────────`,
       `🔎 Live verification:`,
       `FlightStats: ${fsUrl}`,
@@ -280,6 +299,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         .single();
 
       if (error || !data) return;
+      lastScrapeTime = data.last_run;
       if (lastRefreshedEl) {
         lastRefreshedEl.textContent = `Last checked: ${timeAgo(data.last_run)}`;
       }
