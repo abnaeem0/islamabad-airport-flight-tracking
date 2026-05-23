@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     PK: {
       name:      'Pakistan Intl (PIA)',
       contact:   '111-786-786',
-      statusUrl: 'https://www.piac.com.pk/travel-information/flight-status',
+      statusUrl: 'https://book-pia.crane.aero/ibe/flightStatus?&tab=route',
       fsCode:    'PK',
       fsSuffix:  '',
     },
