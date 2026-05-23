@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       name:      'Pakistan Intl (PIA)',
       contact:   '111-786-786',
       website:   'https://www.piac.com.pk',
-      statusUrl: 'https://www.piac.com.pk/travel-information/flight-status',
+      statusUrl: 'https://book-pia.crane.aero/ibe/flightStatus?&tab=number',
     },
     PA: {
       name:      'AirBlue',
@@ -37,13 +37,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       name:      'Fly Jinnah',
       contact:   '021-111-000-035',
       website:   'https://www.flyjinnah.com',
-      statusUrl: 'https://www.flyjinnah.com/en/help/flight-status',
+      statusUrl: 'https://www.flyjinnah.com/en/manage/flight-status/check-flight-status',
     },
     PF: {
       name:      'AirSial',
       contact:   '021-111-247-742',
       website:   'https://www.airsial.com',
-      statusUrl: 'https://www.airsial.com/flight-status',
+      statusUrl: 'https://www.airsial.com/#plane_search',
     },
   };
 
