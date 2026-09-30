@@ -1,0 +1,19 @@
+flights are stored with spaces so need to keep that in mind when searching
+
+database improvements
+  save flight num without spaces
+  save all data from the api
+    were missing international/departure for filtering
+  consistent naming between tables
+  scraped at time is in utc and updated time in the api is pkt so need to make all same
+  scraping needs to be
+    consistent
+    more frequent closer to flights
+  flights that have terminated like departed, arrived, cancelled or those that are no longer in the database should be marked as no more checking needed. call dropped flights dropped
+
+x add a way to name a search like abus flight
+add notifications for changes in flight or batch of flights
+batch upsert when getting new flights into database
+add a flight tracker eventually
+  or price experimentations. whats a reasonable window to buy in. week earlier etc
+recent searches not showing when page refreshed
