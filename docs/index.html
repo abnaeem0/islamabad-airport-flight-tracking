@@ -5,19 +5,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Islamabad Flight Tracker | Arrivals & Departures</title>
-  <meta name="description" content="Check Islamabad International Airport arrivals and departures. Track live flight status, search by airline, flight number, or city.">
+  <meta name="description" content="Check Islamabad International Airport arrivals and departures. Track flight status and change history. Search by flight number, airline code, or date, then filter by city.">
   <link rel="stylesheet" href="style.css" />
   <meta name="robots" content="index, follow">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-F5WJZW6DMV"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-F5WJZW6DMV');
+  </script>
 </head>
-
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-F5WJZW6DMV"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-F5WJZW6DMV');
-</script>
 
 <body>
   <header class="site-header">
@@ -37,7 +36,7 @@
     <h2>Islamabad International Airport Flight Information</h2>
     <p>
       Use this flight tracker to check Islamabad International Airport arrivals and departures.
-      Search flights by airline, flight number, city, or date.
+      Search by flight number, airline code (for example PK), or date, then filter by city.
     </p>
     <p>
       This tool provides up-to-date flight data for travelers and visitors.
@@ -47,7 +46,7 @@
   <!-- Search bar — flight number, date, type, and route filters -->
   <div id="search-container">
 
-    <input type="text" id="flight-search" placeholder="Flight number or airline (optional)">
+    <input type="text" id="flight-search" placeholder="Flight no. or airline code (optional)">
     <input type="date" id="flight-date">
 
     <div class="filter-row">
