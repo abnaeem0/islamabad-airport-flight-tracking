@@ -36,12 +36,148 @@
   </div>
 
   <div class="content-card content-card--narrow">
-    <p>If you have feedback or suggestions, please email:</p>
-    <a href="mailto:contact@yourdomain.com" class="contact-email">contact@yourdomain.com</a>
+    <form id="contact-form" class="contact-form" novalidate>
+
+      <label for="cf-name">Your name <span class="cf-optional">(optional)</span></label>
+      <input id="cf-name" name="name" type="text" maxlength="80" autocomplete="name">
+
+      <label for="cf-email">Email <span class="cf-optional">(optional, so we can reply)</span></label>
+      <input id="cf-email" name="email" type="email" maxlength="120" autocomplete="email" inputmode="email">
+
+      <label for="cf-message">Message</label>
+      <textarea id="cf-message" name="message" rows="5" maxlength="2000" required></textarea>
+
+      <label class="cf-check" for="cf-callback">
+        <input id="cf-callback" type="checkbox">
+        <span>Please call me back</span>
+      </label>
+
+      <div id="cf-callback-fields" hidden>
+        <label for="cf-phone">Phone number</label>
+        <input id="cf-phone" name="phone" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" placeholder="0300 1234567">
+
+        <label for="cf-time">Best time to call <span class="cf-optional">(optional)</span></label>
+        <input id="cf-time" name="callback_time" type="text" maxlength="60" placeholder="e.g. evenings after 6 pm">
+
+        <p class="cf-note">Your number is used only to call you back about this message.</p>
+      </div>
+
+      <!-- Spam trap: real visitors never see or fill this -->
+      <div class="cf-hp" aria-hidden="true">
+        <label>Leave this field empty
+          <input id="cf-website" type="text" name="website" tabindex="-1" autocomplete="off">
+        </label>
+      </div>
+
+      <button type="submit" id="cf-submit" class="cf-submit">Send message</button>
+      <p id="cf-status" class="cf-status" role="status" aria-live="polite"></p>
+    </form>
+
     <p class="contact-disclaimer">This website is not affiliated with the airport or any airline.</p>
   </div>
 
   <footer class="site-footer">
     <p>© 2026 Islamabad Flight Tracker</p>
     <nav>
-      <a href="index.html">Ho
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+  </footer>
+
+  <script>
+    // The form sends messages through Web3Forms, which emails them to the site owner.
+    // To switch it on: create a free access key at web3forms.com and paste it below.
+    // (The key is meant to be public; the owner's email address is never in this page.)
+    const WEB3FORMS_ACCESS_KEY = 'PASTE_YOUR_WEB3FORMS_ACCESS_KEY_HERE';
+    const keyReady = !WEB3FORMS_ACCESS_KEY.startsWith('PASTE_');
+
+    const form       = document.getElementById('contact-form');
+    const statusEl   = document.getElementById('cf-status');
+    const submitBtn  = document.getElementById('cf-submit');
+    const callbackCb = document.getElementById('cf-callback');
+    const callbackBox = document.getElementById('cf-callback-fields');
+
+    function setStatus(text, kind) {
+      statusEl.textContent = text;
+      statusEl.className = 'cf-status' + (kind ? ' cf-status--' + kind : '');
+    }
+
+    callbackCb.addEventListener('change', () => {
+      callbackBox.hidden = !callbackCb.checked;
+    });
+
+    if (!keyReady) {
+      submitBtn.disabled = true;
+      setStatus('The contact form is not switched on yet. Please check back soon.', 'warn');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!keyReady) return;
+
+      // Spam trap filled in: pretend success, send nothing
+      if (document.getElementById('cf-website').value) {
+        setStatus('Thanks! Your message was sent.', 'ok');
+        return;
+      }
+
+      const name    = document.getElementById('cf-name').value.trim();
+      const email   = document.getElementById('cf-email').value.trim();
+      const message = document.getElementById('cf-message').value.trim();
+      const wantsCall = callbackCb.checked;
+      const phone   = document.getElementById('cf-phone').value.trim();
+      const time    = document.getElementById('cf-time').value.trim();
+
+      if (!message) {
+        setStatus('Please write a message.', 'error');
+        document.getElementById('cf-message').focus();
+        return;
+      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setStatus('That email address does not look right.', 'error');
+        document.getElementById('cf-email').focus();
+        return;
+      }
+      if (wantsCall && phone.replace(/\D/g, '').length < 7) {
+        setStatus('Please enter a phone number so we can call you back.', 'error');
+        document.getElementById('cf-phone').focus();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      setStatus('Sending...', '');
+
+      try {
+        const res = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            access_key: WEB3FORMS_ACCESS_KEY,
+            subject: wantsCall ? 'Flight Tracker: callback requested' : 'Flight Tracker: contact form',
+            from_name: 'Islamabad Flight Tracker website',
+            name: name || 'Not given',
+            email: email,
+            message: message,
+            callback_requested: wantsCall ? 'Yes' : 'No',
+            phone: wantsCall ? phone : '',
+            best_time_to_call: wantsCall ? time : ''
+          })
+        });
+        const result = await res.json();
+        if (!res.ok || !result.success) throw new Error(result.message || 'Request failed');
+
+        form.reset();
+        callbackBox.hidden = true;
+        setStatus('Thanks! Your message was sent.', 'ok');
+      } catch (err) {
+        console.error(err);
+        setStatus('Sorry, your message could not be sent. Please try again later.', 'error');
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+
+</body>
+</html>

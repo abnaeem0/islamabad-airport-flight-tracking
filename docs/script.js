@@ -1,13 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-  if (typeof supabase === 'undefined') {
-    console.error('Supabase failed to load.');
-    return;
-  }
+  // If the Supabase script is blocked or slow, keep the rest of the page working
+  // (saved searches still show); only searching is disabled.
+  const supabaseReady = typeof supabase !== 'undefined';
+  if (!supabaseReady) console.error('Supabase failed to load.');
 
   const supabaseUrl = 'https://sbaweaytsmdmhaclgcwr.supabase.co';
   const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
-  const client = supabase.createClient(supabaseUrl, supabaseKey);
+  const client = supabaseReady ? supabase.createClient(supabaseUrl, supabaseKey) : null;
 
   const searchBtn       = document.getElementById('search-btn');
   const resultsDiv      = document.getElementById('search-results');
@@ -18,7 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const natureSelect    = document.getElementById('nature-filter');
   const clearHistoryBtn = document.getElementById('clear-history-btn');
 
-  if (dateInput) dateInput.valueAsDate = new Date();
+  // Default to today's date in Pakistan time (valueAsDate would use the UTC date,
+  // which is yesterday between midnight and 5am in Pakistan)
+  if (dateInput) dateInput.value = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' });
 
   // Show history on page load
   renderHistory();
@@ -52,6 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return h * 60 + m;
   }
 
+  // Escape text before it is placed into innerHTML (values come from a third-party feed)
+  function esc(val) {
+    return String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   // Normalise flight number input — strip spaces, hyphens, underscores, uppercase
   function normaliseQuery(input) {
     return input.replace(/[\s\-_]/g, '').toUpperCase();
@@ -78,6 +86,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const cityFilter   = citySelect.value;
     const natureFilter = natureSelect ? natureSelect.value : '';
 
+    if (!client) {
+      resultsDiv.innerHTML = '<p class="error">Flight search is unavailable right now because a required script did not load. Please reload the page.</p>';
+      return;
+    }
+
     if (!date) {
       resultsDiv.innerHTML = '<p class="error">Please select a date.</p>';
       return;
@@ -99,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Populate city filter above results and show it
       const cities = [...new Set(flights.map(f => f.city).filter(Boolean))].sort();
       citySelect.innerHTML = '<option value="">All Cities</option>' +
-        cities.map(c => `<option value="${c}" ${c === cityFilter ? 'selected' : ''}>${c}</option>`).join('');
+        cities.map(c => `<option value="${esc(c)}" ${c === cityFilter ? 'selected' : ''}>${esc(c)}</option>`).join('');
       cityFilterWrap.style.display = cities.length ? 'flex' : 'none';
 
       // Apply city filter client-side so dropdown stays intact
@@ -129,9 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const info = document.createElement('div');
         info.innerHTML = `
-          <strong>${f.flight_number}</strong> | ${f.type} | ${f.city ?? '—'}
-          ${f.nature ? `<span class="flight-nature ${f.nature.toLowerCase()}">${f.nature}</span>` : ''}
-          <br>ST: ${f.st ?? '—'} | ET: ${f.et ?? '—'} | Status: ${f.status ?? '—'}
+          <strong>${esc(f.flight_number)}</strong> | ${esc(f.type)} | ${esc(f.city ?? '—')}
+          ${f.nature ? `<span class="flight-nature ${esc(f.nature.toLowerCase())}">${esc(f.nature)}</span>` : ''}
+          <br>ST: ${esc(f.st ?? '—')} | ET: ${esc(f.et ?? '—')} | Status: ${esc(f.status ?? '—')}
         `;
 
         const btn = document.createElement('button');
@@ -165,21 +178,37 @@ document.addEventListener('DOMContentLoaded', () => {
   // isFlightSearch = true if a specific flight was searched
   // userLabel      = optional custom name (e.g. "Mr Haseeb")
 
-  function saveToLocalHistory(label, date, isFlightSearch) {
-    let history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
-    history = history.filter(h => !(h.label === label && h.date === date));
-    history.unshift({ label, date, isFlightSearch, userLabel: '' });
-    if (history.length > 10) history.pop();
-    localStorage.setItem('flightHistory', JSON.stringify(history));
-    renderHistory();
+  // Read saved searches; a missing, damaged or blocked store gives an empty list
+  function loadHistory() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('flightHistory') || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
   }
 
   function saveHistory(history) {
-    localStorage.setItem('flightHistory', JSON.stringify(history));
+    try {
+      localStorage.setItem('flightHistory', JSON.stringify(history));
+    } catch (e) {
+      // storage full or blocked (e.g. private mode): searching still works
+    }
+  }
+
+  function saveToLocalHistory(label, date, isFlightSearch) {
+    let history = loadHistory();
+    // Keep the custom name (e.g. "Mr Haseeb") when the same search is repeated
+    const existing = history.find(h => h.label === label && h.date === date);
+    history = history.filter(h => !(h.label === label && h.date === date));
+    history.unshift({ label, date, isFlightSearch, userLabel: existing ? (existing.userLabel || '') : '' });
+    if (history.length > 10) history.pop();
+    saveHistory(history);
+    renderHistory();
   }
 
   function renderHistory() {
-    const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
+    const history = loadHistory();
     historyList.innerHTML = '';
 
     if (!history.length) {
@@ -241,7 +270,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function startEditing(el, index) {
-    const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
+    const history = loadHistory();
+    if (!history[index]) return;
     const current = history[index].userLabel || '';
 
     const input       = document.createElement('input');
@@ -268,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function moveHistory(index, direction) {
-    const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
+    const history = loadHistory();
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= history.length) return;
     [history[index], history[newIndex]] = [history[newIndex], history[index]];
@@ -277,14 +307,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function deleteHistory(index) {
-    const history = JSON.parse(localStorage.getItem('flightHistory') || '[]');
+    const history = loadHistory();
     history.splice(index, 1);
     saveHistory(history);
     renderHistory();
   }
 
   clearHistoryBtn.addEventListener('click', () => {
-    localStorage.removeItem('flightHistory');
+    try { localStorage.removeItem('flightHistory'); } catch (e) { /* ignore */ }
     renderHistory();
   });
 

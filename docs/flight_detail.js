@@ -14,6 +14,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ===== SUPABASE =====
+  if (typeof supabase === 'undefined') {
+    flightInfoDiv.innerHTML = '<p>Flight history is unavailable right now because a required script did not load. Please reload the page.</p>';
+    document.getElementById('snapshot-controls').style.display = 'none';
+    document.getElementById('snapshot-table').style.display   = 'none';
+    return;
+  }
   const supabaseUrl = 'https://sbaweaytsmdmhaclgcwr.supabase.co';
   const supabaseKey = 'sb_publishable_PBY7Y_HM60Ijqw9j6iOGeg_XqLDI7SS';
   const client      = supabase.createClient(supabaseUrl, supabaseKey);
@@ -66,6 +72,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ===== UTILS =====
 
+  // scraped_at is stored as a UTC clock value without a timezone marker, so a value
+  // with no zone is treated as UTC and shown in Pakistan time.
   function formatPKT(dateStr) {
     const normalized = dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : dateStr + 'Z';
     const utcDate = new Date(normalized);
@@ -79,8 +87,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Escape text before it is placed into innerHTML (values come from a third-party feed)
+  function esc(val) {
+    return String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // HTML-safe display text; missing values show a dash
   function display(val) {
-    return val ?? '—';
+    return val == null ? '—' : esc(val);
   }
 
   function timeAgo(dateStr) {
@@ -239,7 +254,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `✈️ Flight Update`,
       `Flight: ${flightNumber}`,
       `Route: ${route}`,
-      `⏰ Departure: ${dep}`,
+      `⏰ ${isArrival ? 'Arrival' : 'Departure'}: ${dep}`,
       `📊 Status: ${status}`,
       `🕒 Last scraped: ${lastUpd} PKT`,
       `────────────────`,
