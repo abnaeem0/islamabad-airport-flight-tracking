@@ -6,9 +6,9 @@ Public repo: no email, phone, credentials or security details in this file.
 
 ## 1. Current handoff
 
-- **Goal now:** upload the prepared site fixes (listed under "Proposed edits awaiting upload" in section 4), switch to the two-file docs, then pick one small task.
+- **Goal now:** switch on the contact form (needs the owner's key), delete the old doc files, then pick one small task.
 - **Owner reports:** everything is working; both collectors are running; an external cron-job.org job dispatches both workflows about every 15 minutes.
-- **Site fixes prepared 2026-11-01:** 7 files under `docs/` (index, flight_detail, about, contact, flight_detail.js, script.js, style.css). **PROPOSED and CHECKED** in a local headless browser against a stubbed database (18 checks pass, and the same checks fail on the current files). **Not yet saved to GitHub, not checked on the live site.**
+- **Site fixes live since 2026-11-01:** 7 files under `docs/` merged to `main` (PR #5, commit `9d4e72f`). Checked in a local headless browser against a stubbed database (18 checks pass; the same checks fail on the old files) and, per the owner's report on 2026-11-01, **checked on the live site**. The contact form is applied but **not switched on** (no access key yet).
 - **Checked in the repo on 2026-11-01 (code evidence, not runtime):**
   - Workflows exist and are manual-trigger only (cron commented out).
   - Both collectors compute dates with naive `datetime.now()` (`scraper.py:245`, `origin_scraper.py:473`). On a GitHub runner (UTC by default, `[UNVERIFIED]` from a log) that is one day behind PKT between 00:00 and 05:00. Impact is small: today is still covered, tomorrow's flights simply appear after 05:00 PKT (BL-002).
@@ -18,9 +18,9 @@ Public repo: no email, phone, credentials or security details in this file.
   - `docs/flight_detail.js:242` labels arrivals "Departure" (BL-004).
 - **Owner decisions:** Islamabad only; origin context for domestic arrivals; free Supabase; ingestion matters more than long history; no public email or phone (use a contact form); two doc files only.
 - **Not seen yet:** `source_priority` contents; recent run logs; the cron-job.org settings; whether any access fix (BL-017) was applied; whether the live Supabase `scraped_at` values really are UTC (code says yes, see BL-009 evidence).
-- **Owner setup, left for later:** (1) create a free Web3Forms access key and paste it into `docs/contact.html` (BL-028); (2) private BL-017 access review; (3) paste `SELECT * FROM public.source_priority;`; (4) run the read-only `scraped_at` check under BL-009; (5) cron-job.org settings for BL-001; (6) delete the old doc files (section 6).
+- **Owner setup, left for later:** (1) create a free Web3Forms access key and paste it into `docs/contact.html` (BL-028), then send a test message; (2) private BL-017 access review; (3) paste `SELECT * FROM public.source_priority;`; (4) run the read-only `scraped_at` check under BL-009; (5) cron-job.org settings for BL-001; (6) delete the old doc files (section 6).
 - **Docs migration:** delete the old doc files listed in section 6 after saving these two (history stays in git). `docs/` is the published website folder, so the old `.md` files there are publicly served.
-- **Suggested next sequence:** upload and check the prepared fixes -> BL-017 (private evidence) -> switch on the contact form (BL-028 key) -> BL-002 -> BL-010A (validate origin data) -> BL-021 / BL-022 -> BL-010B/C. A newly observed outage goes first.
+- **Suggested next sequence:** BL-017 (private evidence) -> switch on the contact form (BL-028 key) -> BL-002 -> BL-010A (validate origin data) -> BL-021 / BL-022 -> BL-010B/C. A newly observed outage goes first.
 
 ## 2. Spec
 
@@ -76,12 +76,12 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 |---|---|---|---|---|---|
 | BL-001 | chore | P2 | S | Ready | Document actual scheduler setup (cron-job.org target, interval, retries, recent outcomes) |
 | BL-002 | bug | P1 | S | Ready | Use PKT airport dates in both collectors |
-| BL-003 | bug | P2 | S | Proposed | Saved history when the Supabase script fails to load |
-| BL-004 | bug | P2 | S | Proposed | Share text: correct Arrival/Departure label |
+| BL-003 | bug | P2 | S | Done | Saved history when the Supabase script fails to load |
+| BL-004 | bug | P2 | S | Done | Share text: correct Arrival/Departure label |
 | BL-005 | bug | P2 | S | Cancelled | Plain contact email (superseded by BL-028 / D-014) |
 | BL-006 | chore | P2 | M | Ready | Unify flight-number normalisation |
-| BL-007 | bug | P1 | M | Proposed | Render external values safely (no raw `innerHTML`) |
-| BL-008 | chore | P3 | S | Proposed | Put analytics scripts inside `<head>` |
+| BL-007 | bug | P1 | M | Done | Render external values safely (no raw `innerHTML`) |
+| BL-008 | chore | P3 | S | Done | Put analytics scripts inside `<head>` |
 | BL-009 | chore | P2 | M | Ready | Timestamp storage and display contract (label PKT) |
 | BL-010 | feature | P2 | L | Blocked | Origin-airport context on domestic Islamabad arrivals (parent) |
 | BL-010A | research | P1 | S | Ready | Validate current origin collection |
@@ -100,14 +100,14 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-020 | research | P2 | S | Inbox | Measure retention and storage before extending |
 | BL-021 | bug | P1 | M | Ready | Report honest freshness and batch outcomes |
 | BL-022 | bug | P1 | M | Ready | Keep direction in flight history identity |
-| BL-023 | bug | P2 | S | Ready | Preserve labels and saved filter state (label part proposed) |
+| BL-023 | bug | P2 | S | Ready | Preserve labels and saved filter state (label part done; city and stale filters still open) |
 | BL-024 | bug | P2 | M | Ready | Share actual current state and retained route |
 | BL-025 | bug | P1 | M | Ready | Guard against false drops from partial feeds |
 | BL-026 | chore | P2 | M | Inbox | Avoid overlapping writers; pin environment |
 | BL-027 | research | P2 | M | Inbox | Diagnose disabled TLS verification |
-| BL-028 | feature | P1 | M | Proposed | Contact form with callback option; repair truncated `contact.html` (needs owner's form key to go live) |
-| BL-029 | bug | P2 | S | Proposed | Search page default date used the UTC date, not Pakistan's |
-| BL-030 | bug | P2 | S | Proposed | Flight details page layout: unstyled header, table overflow, unreadable share links |
+| BL-028 | feature | P1 | M | Testing | Contact form with callback option; footer repaired and email removed (done). Not live until the owner's form key is pasted and a test message arrives |
+| BL-029 | bug | P2 | S | Done | Search page default date used the UTC date, not Pakistan's |
+| BL-030 | bug | P2 | S | Done | Flight details page layout: unstyled header, table overflow, unreadable share links |
 
 ### Task records
 
@@ -170,9 +170,9 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 - Needs: current `docs/contact.html`; the owner creates the form key privately.
 - Accept: test message arrives; view-source of the page contains no personal address or number; empty submit rejected; footer and navigation complete on mobile.
 
-### Proposed edits awaiting upload (prepared 2026-11-01)
+### Applied edits (merged 2026-11-01, commit `9d4e72f`, PR #5)
 
-Files: `docs/index.html`, `flight_detail.html`, `about.html`, `contact.html`, `flight_detail.js`, `script.js`, `style.css`. Replace each file in GitHub with the prepared copy. After upload: mark items Testing, do the live checks below, then Done with the commit reference.
+Files: `docs/index.html`, `flight_detail.html`, `about.html`, `contact.html`, `flight_detail.js`, `script.js`, `style.css`. Saved as one squashed commit, so one revert (the Revert button on PR #5) undoes all of it. Owner reported the live checks done on 2026-11-01. Still open: BL-028 (needs the form key and a real test message), the BL-023 city/filter part, BL-024, and the `scraped_at` check under BL-009.
 
 - **BL-003:** `script.js` no longer stops when Supabase fails to load: saved searches still show and search explains the problem; the details page gets the same guard. Damaged or blocked browser storage no longer breaks the page. Live check: open the site, confirm recent searches show; in DevTools block `unpkg.com` and reload, confirm saved searches still show.
 - **BL-004:** share text says Arrival or Departure from the flight's own direction. Live check: share one arrival and one departure.
@@ -187,6 +187,8 @@ Files: `docs/index.html`, `flight_detail.html`, `about.html`, `contact.html`, `f
 - **BL-009 evidence (not a change):** `scraper.py` writes `scraped_at` from `datetime.now(timezone.utc).isoformat()` into a `timestamp without time zone` column. Postgres ignores the offset in that case and stores the UTC clock value. The details page reads zone-less values as UTC and shows PKT, so the display is consistent provided the scrapers produce UTC. Not yet verified on live data. Read-only check for later: `SELECT max(scraped_at) AS latest_scraped_at, now() AT TIME ZONE 'UTC' AS utc_now FROM public.flight_snapshots;` the two should differ by minutes at most (about 5 hours apart would mean local time).
 
 ### Done and history
+
+2026-11-01 (PR #5, commit `9d4e72f`, owner-checked live): BL-003, BL-004, BL-007, BL-008, BL-029, BL-030; label part of BL-023; copy part of BL-016; contact page repaired (BL-028 applied, not yet live).
 
 Original wishlist items already in the product: named saved searches; full API field capture; terminal-status handling for drop detection; both collectors activated (owner report). Earlier chat claims of missing workflows, guaranteed terminal skipping, automatic cutoff or deletion, and an immediate history extension are superseded.
 Earlier labels `FT-001..018` from the ChatGPT review map to: FT-001 BL-001, FT-002 BL-021, FT-003 BL-022, FT-004 BL-002/BL-009, FT-005 BL-025, FT-006 BL-001/BL-017, FT-007 BL-007, FT-008 BL-023, FT-009 BL-004/BL-024, FT-010 BL-010/BL-019, FT-011 BL-020, FT-012 BL-006, FT-013 BL-013/BL-026, FT-014 BL-027, FT-015 BL-005, FT-016 BL-011, FT-017 BL-014/BL-015, FT-018 BL-017.
@@ -212,6 +214,11 @@ Evidence date 2026-09-30, from a catalog report, the view SQL and the repo; not 
 After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-01 | Claude | live checks recorded
+- Done: merged PR #5 to `main` at the owner's request (squash commit `9d4e72f`); the owner then reported the live checks done. Marked BL-003, BL-004, BL-007, BL-008, BL-029, BL-030 Done and BL-028 Testing; updated the handoff.
+- Not verified by me: the live site (this environment cannot reach it); the owner's report is the evidence.
+- Next: owner creates the Web3Forms key, pastes it into `docs/contact.html` and sends a test message; then BL-017 and the `source_priority` result.
 
 ### 2026-11-01 | Claude | site fixes (second session)
 - Goal: fix obvious bugs in the live pages (contact, layout and similar); record the `scraped_at` timezone finding.
