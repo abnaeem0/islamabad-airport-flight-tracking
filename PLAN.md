@@ -17,8 +17,9 @@ Public repo: no email, phone, credentials or security details in this file.
   - `docs/script.js`: the Supabase-load guard (line 3) returns before `renderHistory()` (line 24), which supports the BL-003 hypothesis.
   - `docs/flight_detail.js:242` labels arrivals "Departure" (BL-004).
 - **Owner decisions:** Islamabad only; origin context for domestic arrivals; free Supabase; ingestion matters more than long history; no public email or phone (use a contact form); two doc files only.
-- **Not seen yet:** `source_priority` contents; recent run logs; the cron-job.org settings; whether any access fix (BL-017) was applied; whether the live Supabase `scraped_at` values really are UTC (code says yes, see BL-009 evidence).
-- **Owner setup, left for later:** (1) create a free Web3Forms access key and paste it into `docs/contact.html` (BL-028), then send a test message; (2) private BL-017 access review; (3) paste `SELECT * FROM public.source_priority;`; (4) run the read-only `scraped_at` check under BL-009; (5) cron-job.org settings for BL-001; (6) delete the old doc files (section 6).
+- **Not seen yet:** recent run logs; the cron-job.org settings; whether the BL-017 fix has been applied (the 2026-11-02 check shows it was still needed).
+- **Verified 2026-11-02 (owner ran read-only queries):** `source_priority` holds `paa` (priority 10, in use), `airline_web` (20) and `adsb` (30), the last two registered with no collector yet. `scraped_at` is stored as UTC (latest value 3 minutes behind UTC now), so the details page's UTC-to-PKT display is right and BL-009's open question is closed. `origin_scraper_status.last_run` was 7 minutes old, consistent with the ~15-minute dispatch. BL-017 is still needed (details kept private).
+- **Owner setup, left for later:** (1) create a free Web3Forms access key and paste it into `docs/contact.html` (BL-028), then send a test message; (2) run the private BL-017 fix and re-run the permission check; (3) cron-job.org settings for BL-001; (4) delete the old doc files and close draft PR #4 (section 6).
 - **Docs migration:** delete the old doc files listed in section 6 after saving these two (history stays in git). `docs/` is the published website folder, so the old `.md` files there are publicly served.
 - **Suggested next sequence:** BL-017 (private evidence) -> switch on the contact form (BL-028 key) -> BL-002 -> BL-010A (validate origin data) -> BL-021 / BL-022 -> BL-010B/C. A newly observed outage goes first.
 
@@ -129,7 +130,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 
 **BL-009** Original observations are timezone-less, newer are aware, raw update timestamps differ. Accept: generated vs source semantics documented, fixtures display correct PKT, no blind database cast, any migration proposed separately from display changes. Includes labelling ST/ET as PKT in the UI.
 
-**BL-010 / A / B / C / D** Parent initiative, done in children. **A:** read source registry and status, and the newest origin-workflow logs; confirm valid origin airports and freshness; spot batch failures behind a green run. **B** (blocked on A): rank ties, wrong-airport rows, duplicate matches, missing routes and same-date joins; deterministic leg pairs on sanitised fixtures; no ambiguous +/-1 day matches. **C** (blocked on B and the Open question 2): for a domestic arrival show departure-board status, ST/ET, source and its own time; test valid, missing, stale and conflicting data; header and Islamabad history unchanged; never claim actual aircraft location. **D:** optional, compare coverage, history window, performance, rollback before any cutover or retirement.
+**BL-010 / A / B / C / D** Parent initiative, done in children. **A:** read source registry and status, and the newest origin-workflow logs; confirm valid origin airports and freshness; spot batch failures behind a green run. **B** (blocked on A): rank ties, wrong-airport rows, duplicate matches, missing routes and same-date joins; deterministic leg pairs on sanitised fixtures; no ambiguous +/-1 day matches. **C** (blocked on B and the Open question 2): for a domestic arrival show departure-board status, ST/ET, source and its own time; test valid, missing, stale and conflicting data; header and Islamabad history unchanged; never claim actual aircraft location. **D:** optional, compare coverage, history window, performance, rollback before any cutover or retirement. *Progress 2026-11-02 on A:* source registry read (only `paa` in use); origin status was fresh. Still to do: confirm which origin airports report valid data and look for batch failures in the logs.
 
 **BL-011** Need channel, recipients, opt-in, triggers, identity and cost decisions; do not assume Telegram or accounts. Split before implementing.
 
@@ -141,7 +142,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 
 **BL-016** Sitemap lists `flight_detail.html` (useless without query parameters); non-local airline logos hotlink `pics.avs.io`; README to become a short pointer to these two files.
 
-**BL-017** Confirmed by the private owner-supplied report: excess public write privileges and missing protection on one status table. Need an explicit relation/role plan, a view security review, and preserved collector access. Accept: public reads work, unnecessary public writes denied, collector writes preserved, inherited privileges considered, safe non-destructive verification. **Keep the evidence and the SQL private** (not in this repo, not in public chats).
+**BL-017** Confirmed by the private owner-supplied report: excess public write privileges and missing protection on one status table. Need an explicit relation/role plan, a view security review, and preserved collector access. Accept: public reads work, unnecessary public writes denied, collector writes preserved, inherited privileges considered, safe non-destructive verification. **Keep the evidence and the SQL private** (not in this repo, not in public chats). Owner's read-only check on 2026-11-02 shows the issue is still present.
 
 **BL-018** Setting `REQUIRE_ISB_LEG = True` excludes unrelated rows from the "seen" set, so drop detection would mark existing unrelated rows Dropped. Deleting data is not a prerequisite and has no rollback without an export. Accept: filter and drop scope defined together, retained unrelated rows not falsely dropped, owner approves before the flag flips, no hidden cleanup. (This replaces my earlier suggestion to delete rows first.)
 
@@ -184,7 +185,7 @@ Files: `docs/index.html`, `flight_detail.html`, `about.html`, `contact.html`, `f
 - **BL-030 (new):** details page: the header block sat flush against the screen edge, the table ran edge to edge on desktop and scrolled sideways on phones, "Last checked" was misaligned, and links in the share box were dark blue on dark. Now a centred header card, a table that fits from 320 to 1280 px wide, a back link, readable links.
 - **Copy (part of BL-016):** the search page and About text no longer promise airline-name or free-text city search; About names the real audience.
 - **Not changed:** BL-024 (share link parsing for unusual airline codes, dropped-flight route), BL-022, BL-021.
-- **BL-009 evidence (not a change):** `scraper.py` writes `scraped_at` from `datetime.now(timezone.utc).isoformat()` into a `timestamp without time zone` column. Postgres ignores the offset in that case and stores the UTC clock value. The details page reads zone-less values as UTC and shows PKT, so the display is consistent provided the scrapers produce UTC. Not yet verified on live data. Read-only check for later: `SELECT max(scraped_at) AS latest_scraped_at, now() AT TIME ZONE 'UTC' AS utc_now FROM public.flight_snapshots;` the two should differ by minutes at most (about 5 hours apart would mean local time).
+- **BL-009 evidence (not a change):** `scraper.py` writes `scraped_at` from `datetime.now(timezone.utc).isoformat()` into a `timestamp without time zone` column. Postgres ignores the offset in that case and stores the UTC clock value. The details page reads zone-less values as UTC and shows PKT, so the display is consistent provided the scrapers produce UTC. Not yet verified on live data. Read-only check for later: `SELECT max(scraped_at) AS latest_scraped_at, now() AT TIME ZONE 'UTC' AS utc_now FROM public.flight_snapshots;` the two should differ by minutes at most (about 5 hours apart would mean local time). **Verified 2026-11-02:** latest `scraped_at` was 13:21 UTC against 13:24 UTC now, so values are stored in UTC.
 
 ### Done and history
 
@@ -214,6 +215,11 @@ Evidence date 2026-09-30, from a catalog report, the view SQL and the repo; not 
 After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-02 | Claude | database checks recorded
+- Done: recorded the owner's read-only query results (source registry, `scraped_at` timezone, origin status freshness, permission check). `scraped_at` confirmed UTC; BL-017 confirmed still needed.
+- Not done: the BL-017 fix itself (owner runs it, private notes); BL-028 form key.
+- Next: owner runs the BL-017 fix and re-runs the permission check; then BL-010A (origin airports and logs) and BL-002.
 
 ### 2026-11-01 | Claude | live checks recorded
 - Done: merged PR #5 to `main` at the owner's request (squash commit `9d4e72f`); the owner then reported the live checks done. Marked BL-003, BL-004, BL-007, BL-008, BL-029, BL-030 Done and BL-028 Testing; updated the handoff.
