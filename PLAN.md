@@ -21,6 +21,7 @@ Public repo: no email, phone, credentials or security details in this file.
 - **Verified 2026-11-02 (owner ran read-only queries):** `source_priority` holds `paa` (priority 10, in use), `airline_web` (20) and `adsb` (30), the last two registered with no collector yet. `scraped_at` is stored as UTC (latest value 3 minutes behind UTC now), so the details page's UTC-to-PKT display is right and BL-009's open question is closed. `origin_scraper_status.last_run` was 7 minutes old, consistent with the ~15-minute dispatch. BL-017 is still needed (details kept private).
 - **Owner setup, left for later:** (1) create a free Web3Forms access key and paste it into `docs/contact.html` (BL-028), then send a test message; (2) run the private BL-017 fix and re-run the permission check; (3) cron-job.org settings for BL-001; (4) delete the old doc files and close draft PR #4 (section 6).
 - **Docs migration:** delete the old doc files listed in section 6 after saving these two (history stays in git). `docs/` is the published website folder, so the old `.md` files there are publicly served.
+- **Prepared 2026-11-02, not merged:** (1) branch `origin-box-2026-11-02`: details-page departure-airport box plus this documentation; (2) a separate scraper branch for PKT dates and the early-morning yesterday window (BL-002, BL-031). Order for the owner: apply the BL-010B view SQL first, check it, then merge the website branch; merge the scraper branch separately and watch one run's log.
 - **Suggested next sequence:** BL-017 (private evidence) -> switch on the contact form (BL-028 key) -> BL-002 -> BL-010A (validate origin data) -> BL-021 / BL-022 -> BL-010B/C. A newly observed outage goes first.
 
 ## 2. Spec
@@ -70,7 +71,7 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-031**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-033**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -86,9 +87,11 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-009 | chore | P2 | M | Ready | Timestamp storage and display contract (label PKT) |
 | BL-010 | feature | P2 | L | Blocked | Origin-airport context on domestic Islamabad arrivals (parent) |
 | BL-010A | research | P1 | S | Ready | Validate current origin collection |
-| BL-010B | bug | P1 | M | Blocked | Validate canonical matching contract |
-| BL-010C | feature | P2 | M | Blocked | Add origin box without switching existing readers |
+| BL-010B | bug | P1 | M | Proposed | Leg-pairing view `isb_arrival_origin_view` (SQL in section 5; tested on a local Postgres, not applied) |
+| BL-010C | feature | P2 | M | Proposed | Departure-airport box on the details page (branch ready; merge only after the BL-010B view exists) |
 | BL-010D | research | P3 | M | Inbox | Evaluate full reader migration later |
+| BL-031 | bug | P1 | S | Proposed | Origin collector: fetch yesterday's departures in the early morning so overnight legs keep updating (with BL-002 PKT dates) |
+| BL-032 | decision | P3 | S | Inbox | Decide whether search/history should read the `origin_*` tables (see Open question in section 2 and BL-010D) |
 | BL-011 | feature | P3 | L | Inbox | Flight-change notifications |
 | BL-012 | feature | P3 | M | Inbox | Adaptive scrape frequency |
 | BL-013 | chore | P3 | M | Inbox | Batch database work where measured |
@@ -130,7 +133,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 
 **BL-009** Original observations are timezone-less, newer are aware, raw update timestamps differ. Accept: generated vs source semantics documented, fixtures display correct PKT, no blind database cast, any migration proposed separately from display changes. Includes labelling ST/ET as PKT in the UI.
 
-**BL-010 / A / B / C / D** Parent initiative, done in children. **A:** read source registry and status, and the newest origin-workflow logs; confirm valid origin airports and freshness; spot batch failures behind a green run. **B** (blocked on A): rank ties, wrong-airport rows, duplicate matches, missing routes and same-date joins; deterministic leg pairs on sanitised fixtures; no ambiguous +/-1 day matches. **C** (blocked on B and the Open question 2): for a domestic arrival show departure-board status, ST/ET, source and its own time; test valid, missing, stale and conflicting data; header and Islamabad history unchanged; never claim actual aircraft location. **D:** optional, compare coverage, history window, performance, rollback before any cutover or retirement. *Progress 2026-11-02 on A:* source registry read (only `paa` in use); origin status was fresh. Still to do: confirm which origin airports report valid data and look for batch failures in the logs.
+**BL-010 / A / B / C / D** Parent initiative, done in children. **A:** read source registry and status, and the newest origin-workflow logs; confirm valid origin airports and freshness; spot batch failures behind a green run. **B** (blocked on A): rank ties, wrong-airport rows, duplicate matches, missing routes and same-date joins; deterministic leg pairs on sanitised fixtures; no ambiguous +/-1 day matches. **C** (blocked on B and the Open question 2): for a domestic arrival show departure-board status, ST/ET, source and its own time; test valid, missing, stale and conflicting data; header and Islamabad history unchanged; never claim actual aircraft location. **D:** optional, compare coverage, history window, performance, rollback before any cutover or retirement. *Progress 2026-11-02 on B and C:* view written and run against 11 synthetic cases on a local Postgres 16 (same day, overnight, daily flight, no departure row, international, empty time, source priority, gap over 6 h, departure after arrival, wrong route); details box tested with a stubbed database (15 checks: matched, stale, unmatched, missing view, hostile text, 320 to 1280 px). Neither is applied to the live database or merged to `main`. *Progress 2026-11-02 on A:* source registry read (only `paa` in use); origin status was fresh. Still to do: confirm which origin airports report valid data and look for batch failures in the logs.
 
 **BL-011** Need channel, recipients, opt-in, triggers, identity and cost decisions; do not assume Telegram or accounts. Split before implementing.
 
@@ -208,6 +211,74 @@ Evidence date 2026-09-30, from a catalog report, the view SQL and the repo; not 
   SHOW timezone;
   SELECT pg_size_pretty(pg_database_size(current_database())) AS database_size;
   ```
+- **BL-010B view: pairing rules.** For each Islamabad arrival, the departure leg is the row of the same flight number, listed by the airport the arrival says it came from, whose destination is Islamabad, with a scheduled departure on the arrival date or the day before, at or before the scheduled arrival and no more than 6 hours earlier. Among candidates the smallest gap wins, and a pair is kept only if each side is the other's best match. If either scheduled time is missing or unreadable, nothing is guessed: the row is `unmatched`. Within one leg, the highest-priority source wins, then the newest `last_checked`, then the source name (deterministic). International arrivals and flights with no departure row stay `unmatched` and the page shows no box. Dates of both legs are exposed (`arrival_date`, `departure_date`) so overnight pairs are visible. Limit: a flight longer than 6 hours would need the window widened (domestic legs are well under that).
+- **BL-010B view SQL** (target: Supabase SQL editor; prerequisites: `origin_flights` and `source_priority` exist as in section 4; creates one view and one grant, changes no data).
+  ```sql
+-- BL-010B: pairs each Islamabad ARRIVAL with the departure leg reported by the origin airport.
+CREATE OR REPLACE VIEW public.isb_arrival_origin_view
+WITH (security_invoker = true) AS
+WITH base AS (
+  SELECT f.*, sp.priority,
+         CASE WHEN f."ST" ~ '^\d{1,2}:\d{2}' THEN
+           (f.scheduled_date + substring(f."ST" from '^\d{1,2}:\d{2}')::time) END AS st_ts
+  FROM public.origin_flights f
+  JOIN public.source_priority sp USING (data_source)
+),
+arr AS (   -- best-ranked Islamabad arrival row per flight/date
+  SELECT DISTINCT ON (flight_number, scheduled_date)
+         flight_number, scheduled_date, origin_city, status, "ST", "ET", st_ts,
+         data_source, last_checked
+  FROM base
+  WHERE type = 'Arrival' AND source_airport = 'Islamabad'
+  ORDER BY flight_number, scheduled_date, priority DESC, last_checked DESC, data_source
+),
+dep AS (   -- best-ranked departure row per flight/date/airport reported by the origin airport
+  SELECT DISTINCT ON (flight_number, scheduled_date, source_airport)
+         flight_number, scheduled_date, source_airport, destination_city, status, "ST", "ET",
+         st_ts, data_source, last_checked, last_updated
+  FROM base
+  WHERE type = 'Departure' AND source_airport <> 'Islamabad' AND destination_city = 'Islamabad'
+  ORDER BY flight_number, scheduled_date, source_airport, priority DESC, last_checked DESC, data_source
+),
+cand AS (  -- departure at or before arrival, within 6 hours; gap known only if both times parse
+  SELECT a.flight_number, a.scheduled_date AS arr_date, d.scheduled_date AS dep_date,
+         d.source_airport, a.st_ts AS a_ts, d.st_ts AS d_ts,
+         extract(epoch FROM a.st_ts - d.st_ts) AS gap_s
+  FROM arr a
+  JOIN dep d ON d.flight_number = a.flight_number
+            AND d.source_airport = a.origin_city
+            AND d.scheduled_date BETWEEN a.scheduled_date - 1 AND a.scheduled_date
+  WHERE a.st_ts IS NOT NULL AND d.st_ts IS NOT NULL
+    AND a.st_ts - d.st_ts BETWEEN interval '0' AND interval '6 hours'
+),
+ranked AS (
+  SELECT c.*,
+         row_number() OVER (PARTITION BY flight_number, arr_date ORDER BY gap_s, dep_date DESC) AS rn_arr,
+         row_number() OVER (PARTITION BY flight_number, dep_date, source_airport ORDER BY gap_s, arr_date) AS rn_dep
+  FROM cand c
+),
+pairs AS (  -- mutual best only
+  SELECT * FROM ranked WHERE rn_arr = 1 AND rn_dep = 1
+)
+SELECT a.flight_number,
+       a.scheduled_date AS arrival_date,
+       a.origin_city,
+       a.status   AS arrival_status, a."ST" AS arrival_st, a."ET" AS arrival_et,
+       a.last_checked AS arrival_checked,
+       p.dep_date AS departure_date,
+       d.source_airport AS departure_airport,
+       d.status   AS departure_status, d."ST" AS departure_st, d."ET" AS departure_et,
+       d.data_source AS departure_source,
+       d.last_checked AS departure_checked,
+       d.last_updated AS departure_last_updated,
+       CASE WHEN p.flight_number IS NULL THEN 'unmatched' ELSE 'matched' END AS match_state
+FROM arr a
+LEFT JOIN pairs p ON p.flight_number = a.flight_number AND p.arr_date = a.scheduled_date
+LEFT JOIN dep d ON d.flight_number = p.flight_number AND d.scheduled_date = p.dep_date
+               AND d.source_airport = p.source_airport;
+GRANT SELECT ON public.isb_arrival_origin_view TO anon, authenticated;
+  ```
+  Checks after applying: `SELECT match_state, count(*) FROM public.isb_arrival_origin_view GROUP BY 1;` returns both `matched` and `unmatched` once domestic data exists; `SELECT * FROM public.isb_arrival_origin_view WHERE departure_date <> arrival_date LIMIT 5;` shows any overnight pairs; the same flight number and date never appears twice. Rollback: `DROP VIEW IF EXISTS public.isb_arrival_origin_view;` (nothing else depends on it; the details page hides its box when the view is missing).
 - More saved SELECT examples for the canonical view are in `notes/REFERENCE_QUERIES.txt`.
 
 ## 6. Repo tidy-up for the two-file switch
@@ -215,6 +286,11 @@ Evidence date 2026-09-30, from a catalog report, the view SQL and the repo; not 
 After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-02 (night) | Claude | origin box prepared
+- Done: pairing view designed and run on a throwaway Postgres 16 with 11 fixtures (all as intended); details-page box written and tested at 320 to 1280 px with a stubbed database; backlog BL-010B/C set to Proposed, BL-031 and BL-032 added.
+- Not done: nothing applied to the live database; nothing merged; BL-017 left for the owner as agreed.
+- Next: owner applies the view SQL and runs its checks; merge the website branch; then BL-010A (which origin airports report valid data) and the scraper branch.
 
 ### 2026-11-02 | Claude | database checks recorded
 - Done: recorded the owner's read-only query results (source registry, `scraped_at` timezone, origin status freshness, permission check). `scraped_at` confirmed UTC; BL-017 confirmed still needed.
