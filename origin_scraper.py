@@ -65,6 +65,20 @@ TERMINAL_STATUSES = ("Dropped", "Cancelled", "Landed", "Departed")
 # Days relative to today to scrape (0 = today, 1 = tomorrow)
 DAY_OFFSETS = [0, 1]
 
+# Airport dates follow Pakistan time (UTC+5, no daylight saving), not the runner's clock.
+PKT = datetime.timezone(datetime.timedelta(hours=5))
+# Before this PKT hour, also fetch yesterday so overnight departures keep updating (BL-031).
+EARLY_MORNING_HOUR = 6
+
+
+def airport_dates(now_utc: datetime.datetime) -> list:
+    """Dates (YYYY-MM-DD, PKT) to fetch for a run at now_utc (timezone-aware)."""
+    now_pkt = now_utc.astimezone(PKT)
+    offsets = list(DAY_OFFSETS)
+    if now_pkt.hour < EARLY_MORNING_HOUR:
+        offsets = [-1] + offsets
+    return [(now_pkt + datetime.timedelta(days=o)).strftime("%Y-%m-%d") for o in offsets]
+
 # Max concurrent API calls — one per airport avoids hammering PAA
 FETCH_WORKERS = 6
 
@@ -470,11 +484,8 @@ def main() -> None:
     cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        now = datetime.datetime.now()
-        dates = [
-            (now + datetime.timedelta(days=offset)).strftime("%Y-%m-%d")
-            for offset in DAY_OFFSETS
-        ]
+        dates = airport_dates(datetime.datetime.now(datetime.timezone.utc))
+        log(f"[DATES] Fetching {dates} (Pakistan time)")
 
         # ---- PHASE 1: Fetch all data concurrently ----
         all_results = fetch_all(dates)

@@ -242,7 +242,8 @@ def main():
     cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        now = datetime.datetime.now()
+        # Airport dates follow Pakistan time (UTC+5, no daylight saving), not the runner's clock
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5)))
 
         # Scrape yesterday, today, and tomorrow
         dates = [
