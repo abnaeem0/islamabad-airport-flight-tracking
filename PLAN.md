@@ -22,6 +22,7 @@ Public repo: no email, phone, credentials or security details in this file.
 - **Owner setup, left for later:** (1) create a free Web3Forms access key and paste it into `docs/contact.html` (BL-028), then send a test message; (2) run the private BL-017 fix and re-run the permission check; (3) cron-job.org settings for BL-001; (4) delete the old doc files and close draft PR #4 (section 6).
 - **Docs migration:** delete the old doc files listed in section 6 after saving these two (history stays in git). `docs/` is the published website folder, so the old `.md` files there are publicly served.
 - **Prepared 2026-11-02, not merged:** (1) branch `origin-box-2026-11-02`: details-page departure-airport box plus this documentation; (2) a separate scraper branch for PKT dates and the early-morning yesterday window (BL-002, BL-031). Order for the owner: apply the BL-010B view SQL first, check it, then merge the website branch; merge the scraper branch separately and watch one run's log.
+- **Prepared 2026-11-03 (PR open, not merged):** BL-032 switch. Apply the view SQL (section 5, "BL-032 views") first, then merge. Rollback: revert the PR (the site goes back to the old tables, which keep filling). Turn off the old Islamabad collector only after several days of side-by-side checks.
 - **Suggested next sequence:** BL-017 (private evidence) -> switch on the contact form (BL-028 key) -> BL-002 -> BL-010A (validate origin data) -> BL-021 / BL-022 -> BL-010B/C. A newly observed outage goes first.
 
 ## 2. Spec
@@ -65,6 +66,7 @@ Accepted owner choices, proposals and observed implementation are different thin
 | D-011 | Storage protects ingestion: no automatic retention extension; keep 2 months / 7 days pending 7-14 days of growth data | Accepted priority |
 | D-012 | One canonical doc set of AGENTS, README and six docs files | **Superseded by D-013** |
 | D-013 | **Two doc files only:** `CLAUDE.md` (rules, architecture) and `PLAN.md` (everything else). Claude hands back full updated files; other LLMs give paste-in wrap-ups. 2026-11-01 | Accepted, owner |
+| D-015 | **Site reads the origin tables for Islamabad** (through the views `isb_flights_view` and `isb_snapshots_view`); 7-day retention is accepted; the origin collector always fetches yesterday for Islamabad. Old tables and the old collector stay untouched until the owner says to stop it. 2026-11-03 | Accepted, owner |
 | D-014 | **No public email or phone.** Contact goes through a form that emails the owner, with an optional callback request. Supersedes the plain-email fix in BL-005. 2026-11-01 | Accepted, owner |
 
 Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Superseded); task ID; problem; decision; alternatives; affected contracts; rollback; evidence; unknowns.` Accepted does not mean shipped; record the commit separately.
@@ -91,7 +93,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-010C | feature | P2 | M | Proposed | Departure-airport box on the details page (branch ready; merge only after the BL-010B view exists) |
 | BL-010D | research | P3 | M | Inbox | Evaluate full reader migration later |
 | BL-031 | bug | P1 | S | Proposed | Origin collector: fetch yesterday's departures in the early morning so overnight legs keep updating (with BL-002 PKT dates) |
-| BL-032 | decision | P3 | S | Inbox | Decide whether search/history should read the `origin_*` tables (see Open question in section 2 and BL-010D) |
+| BL-032 | feature | P1 | M | Proposed | Switch search, history and details to the origin tables via two Islamabad-only views; always fetch yesterday for Islamabad (D-015). PR open, not merged; needs the view SQL applied first |
 | BL-011 | feature | P3 | L | Inbox | Flight-change notifications |
 | BL-012 | feature | P3 | M | Inbox | Adaptive scrape frequency |
 | BL-013 | chore | P3 | M | Inbox | Batch database work where measured |
@@ -155,7 +157,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 
 **BL-021** Both collectors advance run health after failed or empty feeds; the new one catches failed batches. A green workflow is not enough. Accept: failure, empty and success separated, coverage recorded, stale/partial UI honest, total failure cannot look fully fresh.
 
-**BL-022** The database key includes direction (`type`) but detail URLs use only number and date, so an arrival and departure with the same number can mix. Accept: URLs, header, history and share isolate direction; old links handled; same number/date fixture tested.
+**BL-022** *Proposed with BL-032 (history links now carry `&type=`; old links keep the direction of their first record).* In plain words: an arrival and a departure can share a flight number on the same date (the plane arrives, then leaves as the same number). The database keeps them apart, but the details link only had number and date, so the page could mix the two lists into one history. The database key includes direction (`type`) but detail URLs use only number and date, so an arrival and departure with the same number can mix. Accept: URLs, header, history and share isolate direction; old links handled; same number/date fixture tested.
 
 **BL-023** Saving again resets the custom label, city is not saved, replay can keep stale filters. Accept: label survives repeat and replay, full filters restored, malformed storage recovers.
 
@@ -279,6 +281,33 @@ LEFT JOIN dep d ON d.flight_number = p.flight_number AND d.scheduled_date = p.de
 GRANT SELECT ON public.isb_arrival_origin_view TO anon, authenticated;
   ```
   Checks after applying: `SELECT match_state, count(*) FROM public.isb_arrival_origin_view GROUP BY 1;` returns both `matched` and `unmatched` once domestic data exists; `SELECT * FROM public.isb_arrival_origin_view WHERE departure_date <> arrival_date LIMIT 5;` shows any overnight pairs; the same flight number and date never appears twice. Rollback: `DROP VIEW IF EXISTS public.isb_arrival_origin_view;` (nothing else depends on it; the details page hides its box when the view is missing).
+- **BL-032 views** (target: Supabase SQL editor; prerequisites: `origin_flights`, `origin_snapshots`, `source_priority`; creates two views and grants, no data changes). They show only Islamabad rows, in the same column shape as the old tables (`city` is the origin for arrivals and the destination for departures), one row per flight, date and direction, highest-priority source first.
+  ```sql
+-- BL-032: Islamabad-only views over the origin tables, shaped like the old flights / flight_snapshots tables.
+CREATE OR REPLACE VIEW public.isb_flights_view
+WITH (security_invoker = true) AS
+SELECT DISTINCT ON (f.flight_number, f.scheduled_date, f.type)
+       f.flight_number, f.scheduled_date, f.type,
+       CASE WHEN f.type = 'Arrival' THEN f.origin_city ELSE f.destination_city END AS city,
+       f.status, f."ST" AS st, f."ET" AS et, f.nature, f.airline_logo,
+       f.data_source, f.last_checked, f.last_updated
+FROM public.origin_flights f
+JOIN public.source_priority sp USING (data_source)
+WHERE f.source_airport = 'Islamabad'
+ORDER BY f.flight_number, f.scheduled_date, f.type, sp.priority DESC, f.last_checked DESC, f.data_source;
+
+CREATE OR REPLACE VIEW public.isb_snapshots_view
+WITH (security_invoker = true) AS
+SELECT s.id, s.flight_number, s.scheduled_date, s.type,
+       CASE WHEN s.type = 'Arrival' THEN s.origin_city ELSE s.destination_city END AS city,
+       s.status, s."ST" AS st, s."ET" AS et, s.nature,
+       s.data_source, s.scraped_at, s.change_type
+FROM public.origin_snapshots s
+WHERE s.source_airport = 'Islamabad';
+
+GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, authenticated;
+  ```
+  Checks: `SELECT type, count(*) FROM public.isb_flights_view WHERE scheduled_date = (now() AT TIME ZONE 'Asia/Karachi')::date GROUP BY 1;` returns arrivals and departures; compare with `SELECT type, count(*) FROM public.flights WHERE scheduled_date = (now() AT TIME ZONE 'Asia/Karachi')::date GROUP BY 1;` (close, not necessarily equal until yesterday is filled). Rollback: `DROP VIEW IF EXISTS public.isb_flights_view, public.isb_snapshots_view;`.
 - More saved SELECT examples for the canonical view are in `notes/REFERENCE_QUERIES.txt`.
 
 ## 6. Repo tidy-up for the two-file switch
@@ -286,6 +315,11 @@ GRANT SELECT ON public.isb_arrival_origin_view TO anon, authenticated;
 After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-03 | Claude | origin switch prepared
+- Done: BL-032 and BL-022 prepared on a branch: two Islamabad-only views (tested on a local Postgres), site readers switched, history links carry direction, freshness read from the origin status row, origin collector always fetches yesterday for Islamabad; 11 browser checks and 6 plan checks pass. Removed accidentally committed `__pycache__` and ignored it.
+- Not done: nothing applied or merged; the collectors were not run.
+- Next: owner applies the view SQL and checks counts; then merge; watch for several days before turning off the old collector.
 
 ### 2026-11-02 (night) | Claude | origin box prepared
 - Done: pairing view designed and run on a throwaway Postgres 16 with 11 fixtures (all as intended); details-page box written and tested at 320 to 1280 px with a stubbed database; backlog BL-010B/C set to Proposed, BL-031 and BL-032 added.

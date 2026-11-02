@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const urlParams    = new URLSearchParams(window.location.search);
   const flightNumber = urlParams.get('flight');
   const date         = urlParams.get('date');
+  const typeParam    = urlParams.get('type');   // 'Arrival' | 'Departure' | null (old links)
   const flightInfoDiv = document.getElementById('flight-info');
 
   if (!flightNumber || !date) {
@@ -370,9 +371,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function fetchFreshness() {
     try {
       const { data, error } = await client
-        .from('scraper_status')
+        .from('origin_scraper_status')
         .select('last_run')
-        .eq('id', 1)
+        .eq('scraper_id', 'paa_origin')
         .single();
 
       if (error || !data) return;
@@ -388,14 +389,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ===== FETCH SNAPSHOTS & RENDER =====
   async function fetchAndRender() {
     try {
-      const { data: snapshots, error } = await client
-        .from('flight_snapshots')
+      let query = client
+        .from('isb_snapshots_view')
         .select('*')
         .eq('flight_number', flightNumber)
-        .eq('scheduled_date', date)
-        .order('scraped_at', { ascending: true });
+        .eq('scheduled_date', date);
+      if (typeParam === 'Arrival' || typeParam === 'Departure') query = query.eq('type', typeParam);
+      const { data: allSnaps, error } = await query.order('scraped_at', { ascending: true });
 
       if (error) throw error;
+
+      // Old links have no type: keep to the direction of the first record so the two never mix
+      const snapshots = (typeParam || !allSnaps.length)
+        ? allSnaps
+        : allSnaps.filter(s => s.type === allSnaps[0].type);
 
       if (!snapshots.length) {
         flightInfoDiv.innerHTML = '<p>No history available for this flight.</p>';

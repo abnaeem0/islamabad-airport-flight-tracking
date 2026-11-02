@@ -71,13 +71,23 @@ PKT = datetime.timezone(datetime.timedelta(hours=5))
 EARLY_MORNING_HOUR = 6
 
 
-def airport_dates(now_utc: datetime.datetime) -> list:
-    """Dates (YYYY-MM-DD, PKT) to fetch for a run at now_utc (timezone-aware)."""
+def plan_fetch(now_utc: datetime.datetime) -> list:
+    """
+    (date, airport) pairs to fetch for a run at now_utc (timezone-aware), in Pakistan time.
+    Islamabad: yesterday, today, tomorrow, always (BL-032: the site reads Islamabad history).
+    Other airports: today and tomorrow, plus yesterday before EARLY_MORNING_HOUR so
+    overnight departure legs keep updating (BL-031).
+    """
     now_pkt = now_utc.astimezone(PKT)
-    offsets = list(DAY_OFFSETS)
-    if now_pkt.hour < EARLY_MORNING_HOUR:
-        offsets = [-1] + offsets
-    return [(now_pkt + datetime.timedelta(days=o)).strftime("%Y-%m-%d") for o in offsets]
+    day = lambda o: (now_pkt + datetime.timedelta(days=o)).strftime("%Y-%m-%d")
+    early = now_pkt.hour < EARLY_MORNING_HOUR
+    jobs = []
+    for airport in WATCH_AIRPORTS:
+        offsets = list(DAY_OFFSETS)
+        if airport == "Islamabad" or early:
+            offsets = [-1] + offsets
+        jobs += [(day(o), airport) for o in offsets]
+    return jobs
 
 # Max concurrent API calls — one per airport avoids hammering PAA
 FETCH_WORKERS = 6
@@ -135,7 +145,7 @@ def fetch_flights(date_str: str, flight_type: str, city: str) -> tuple[str, str,
     return date_str, flight_type, city, []
 
 
-def fetch_all(dates: list[str]) -> list[tuple]:
+def fetch_all(plan: list) -> list[tuple]:
     """
     Fire all (date, type, airport) fetch jobs concurrently and collect results.
 
@@ -144,9 +154,8 @@ def fetch_all(dates: list[str]) -> list[tuple]:
     """
     jobs = [
         (date_str, flight_type, airport)
-        for date_str    in dates
-        for airport     in WATCH_AIRPORTS
-        for flight_type in ["Arrival", "Departure"]
+        for date_str, airport in plan
+        for flight_type       in ["Arrival", "Departure"]
     ]
 
     total = len(jobs)
@@ -484,11 +493,11 @@ def main() -> None:
     cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        dates = airport_dates(datetime.datetime.now(datetime.timezone.utc))
-        log(f"[DATES] Fetching {dates} (Pakistan time)")
+        plan = plan_fetch(datetime.datetime.now(datetime.timezone.utc))
+        log(f"[DATES] Fetching {sorted(set(d for d, _ in plan))} (Pakistan time), {len(plan)} airport-days")
 
         # ---- PHASE 1: Fetch all data concurrently ----
-        all_results = fetch_all(dates)
+        all_results = fetch_all(plan)
 
         # ---- PHASE 2: Write all results sequentially ----
         log("[WRITE] Processing and writing results to DB...")

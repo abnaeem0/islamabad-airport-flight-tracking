@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsDiv.innerHTML  = '<p>Loading...</p>';
 
     try {
-      let queryBuilder = client.from('flights').select('*').eq('scheduled_date', date);
+      let queryBuilder = client.from('isb_flights_view').select('*').eq('scheduled_date', date);
       if (query)        queryBuilder = queryBuilder.ilike('flight_number', `%${query}%`);
       if (typeFilter)   queryBuilder = queryBuilder.eq('type', typeFilter);
       if (natureFilter) queryBuilder = queryBuilder.eq('nature', natureFilter);
@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const btn = document.createElement('button');
         btn.textContent = 'History';
-        btn.addEventListener('click', () => viewHistory(f.flight_number, date));
+        btn.addEventListener('click', () => viewHistory(f.flight_number, date, f.type));
 
         card.appendChild(img);
         card.appendChild(info);
@@ -338,8 +338,10 @@ document.addEventListener('DOMContentLoaded', () => {
     searchBtn.click();
   };
 
-  window.viewHistory = function(flightNumber, date) {
-    window.location.href = `flight_detail.html?flight=${encodeURIComponent(flightNumber)}&date=${encodeURIComponent(date)}`;
+  window.viewHistory = function(flightNumber, date, type) {
+    // type keeps an arrival and a departure with the same number apart (BL-022)
+    const typePart = type ? `&type=${encodeURIComponent(type)}` : '';
+    window.location.href = `flight_detail.html?flight=${encodeURIComponent(flightNumber)}&date=${encodeURIComponent(date)}${typePart}`;
   };
 
 });
