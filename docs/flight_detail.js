@@ -313,6 +313,59 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // ===== DEPARTURE AIRPORT BOX (domestic arrivals only) =====
+  // Reads the view isb_arrival_origin_view (BL-010B). If the view is missing, empty or
+  // unmatched, the box stays hidden and the rest of the page is unaffected.
+  const originBox = document.getElementById('origin-box');
+  const STALE_MINUTES = 60;
+
+  function hideOriginBox() {
+    if (originBox) { originBox.hidden = true; originBox.innerHTML = ''; }
+  }
+
+  function minutesSince(dateStr) {
+    return (Date.now() - new Date(dateStr).getTime()) / 60000;
+  }
+
+  function renderOriginBox(row) {
+    if (!originBox) return;
+    if (!row || row.match_state !== 'matched') { hideOriginBox(); return; }
+
+    const stale = !row.departure_checked || minutesSince(row.departure_checked) > STALE_MINUTES;
+    const checked = row.departure_checked
+      ? `${esc(timeAgo(row.departure_checked))} (${esc(formatPKT(row.departure_checked))} PKT)`
+      : 'unknown';
+    const overnight = row.departure_date && row.departure_date !== row.arrival_date;
+
+    originBox.innerHTML = `
+      <h2>From ${display(row.departure_airport)}</h2>
+      <p class="origin-status">${display(row.departure_status)}</p>
+      <p>Scheduled departure: ${display(row.departure_st)}${overnight ? ' (' + display(row.departure_date) + ')' : ''}</p>
+      <p>Expected departure: ${display(row.departure_et)}</p>
+      <p class="origin-meta">Source: ${display(row.departure_source === 'paa' ? 'Pakistan Airports Authority departure board' : row.departure_source)}.
+        Last checked ${checked}.</p>
+      ${stale ? '<p class="origin-warn">This information may be out of date.</p>' : ''}
+      <p class="origin-meta">Airport board information, not the aircraft's position.</p>
+    `;
+    originBox.hidden = false;
+  }
+
+  async function fetchOriginBox(flightType) {
+    if (flightType !== 'Arrival') { hideOriginBox(); return; }
+    try {
+      const { data, error } = await client
+        .from('isb_arrival_origin_view')
+        .select('*')
+        .eq('flight_number', flightNumber)
+        .eq('arrival_date', date)
+        .limit(1);
+      if (error || !data || !data.length) { hideOriginBox(); return; }
+      renderOriginBox(data[0]);
+    } catch (e) {
+      hideOriginBox();
+    }
+  }
+
   // ===== FETCH SCRAPER FRESHNESS =====
   async function fetchFreshness() {
     try {
@@ -368,6 +421,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       injectShareButton(snapshots);
 
       renderSnapshots(snapshots);
+      await fetchOriginBox(snapshots[0].type);
 
     } catch (err) {
       console.error(err);

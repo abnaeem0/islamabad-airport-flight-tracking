@@ -1345,3 +1345,20 @@ p.error {
 .cf-status--ok    { color: var(--arrival); }
 .cf-status--error { color: #f87171; }
 .cf-status--warn  { color: var(--departure); }
+
+/* Departure airport box on details page (BL-010C) */
+#origin-box {
+  max-width: 868px;
+  margin: 0.75rem auto 1rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+#origin-box[hidden] { display: none; }
+#origin-box h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+#origin-box p { margin: 0.2rem 0; overflow-wrap: anywhere; }
+#origin-box .origin-status { font-weight: 600; }
+#origin-box .origin-meta { font-size: 0.85rem; opacity: 0.75; }
+#origin-box .origin-warn { color: var(--departure); font-weight: 600; }
