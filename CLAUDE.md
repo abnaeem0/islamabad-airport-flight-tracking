@@ -29,7 +29,7 @@ Data flow: PAA API -> collector (flatten, normalise flight number, compare with 
 - **Flight numbers:** no spaces (`TK571`). The new collector also strips hyphens; the original does not (BL-006).
 - **Terminal statuses:** `Dropped, Cancelled, Landed, Departed`. They are excluded from drop detection only; ordinary upserts and change snapshots still process them. Do not repeat the old code comment that says otherwise.
 - **Change types:** `new, status_change, time_change, city_change, dropped`.
-- **Time:** the owner says displayed PAA times are PKT. Airport dates should be computed in `Asia/Karachi`; observations we generate (`scraped_at`, `last_checked`, `last_run`) are UTC. Original tables store some of those without a timezone. Do not cast or migrate historical timestamps blindly (BL-009).
+- **Time:** the owner says displayed PAA times are PKT. Airport dates should be computed in `Asia/Karachi`; observations we generate (`scraped_at`, `last_checked`, `last_run`) are UTC (verified for `scraped_at` on 2026-11-02). Original tables store some of those without a timezone. Do not cast or migrate historical timestamps blindly (BL-009).
 - **`data_source`** (today `paa`) names a feed; every source must exist in `source_priority`.
 - **Dropped** means "vanished from the feed", not confirmed cancellation. Never present stale or partial data as fresh.
 - **Airport board data is not aircraft position.** Do not invent estimated arrival times unless a rule is agreed.
@@ -46,7 +46,7 @@ Data flow: PAA API -> collector (flatten, normalise flight number, compare with 
 | `origin_flights` | new current state; PK number, date, type, source_airport, data_source; has `origin_city` and `destination_city` |
 | `origin_snapshots` | new change history; bigint id; indexed by source-aware lookup and `scraped_at` |
 | `origin_scraper_status` | new health; row `scraper_id=paa_origin` |
-| `source_priority` | source registry; `data_source`, `priority`. **Contents not yet seen** |
+| `source_priority` | source registry; `data_source`, `priority`. Rows (2026-11-02): `paa` 10 (in use), `airline_web` 20 and `adsb` 30 (registered, no collector yet) |
 | `flight_canonical_view` | ranks sources, splits departure and arrival legs, `FULL JOIN` on number, origin city, destination city and date |
 
 Limits of the view: overnight flights (legs on different dates) do not pair; wrong-airport rows can multiply results; ties in priority are not resolved deterministically; international flights have no origin side. Do not "fix" it with an unrestricted +/-1 day join, which pairs daily flights wrongly (BL-019).
