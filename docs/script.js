@@ -101,12 +101,19 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsDiv.innerHTML  = '<p>Loading...</p>';
 
     try {
-      let queryBuilder = client.from('flights').select('*').eq('scheduled_date', date);
-      if (query)        queryBuilder = queryBuilder.ilike('flight_number', `%${query}%`);
-      if (typeFilter)   queryBuilder = queryBuilder.eq('type', typeFilter);
-      if (natureFilter) queryBuilder = queryBuilder.eq('nature', natureFilter);
-
-      const { data: flights, error } = await queryBuilder;
+      // Reads the origin-based view; if it is missing or errors, falls back to the original table
+      const runSearch = (table) => {
+        let qb = client.from(table).select('*').eq('scheduled_date', date);
+        if (query)        qb = qb.ilike('flight_number', `%${query}%`);
+        if (typeFilter)   qb = qb.eq('type', typeFilter);
+        if (natureFilter) qb = qb.eq('nature', natureFilter);
+        return qb;
+      };
+      let { data: flights, error } = await runSearch('isb_flights_view');
+      if (error) {
+        console.warn('isb_flights_view unavailable, using flights table', error);
+        ({ data: flights, error } = await runSearch('flights'));
+      }
       if (error) throw error;
 
       // Populate city filter above results and show it
@@ -149,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const btn = document.createElement('button');
         btn.textContent = 'History';
-        btn.addEventListener('click', () => viewHistory(f.flight_number, date));
+        btn.addEventListener('click', () => viewHistory(f.flight_number, date, f.type));
 
         card.appendChild(img);
         card.appendChild(info);
@@ -338,8 +345,10 @@ document.addEventListener('DOMContentLoaded', () => {
     searchBtn.click();
   };
 
-  window.viewHistory = function(flightNumber, date) {
-    window.location.href = `flight_detail.html?flight=${encodeURIComponent(flightNumber)}&date=${encodeURIComponent(date)}`;
+  window.viewHistory = function(flightNumber, date, type) {
+    // type keeps an arrival and a departure with the same number apart (BL-022)
+    const typePart = type ? `&type=${encodeURIComponent(type)}` : '';
+    window.location.href = `flight_detail.html?flight=${encodeURIComponent(flightNumber)}&date=${encodeURIComponent(date)}${typePart}`;
   };
 
 });
