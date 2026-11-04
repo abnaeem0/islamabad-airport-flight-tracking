@@ -109,7 +109,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-019 | bug | P1 | M | Inbox | Overnight and duplicate canonical matching |
 | BL-020 | research | P2 | S | Inbox | Measure retention and storage before extending |
 | BL-021 | bug | P1 | M | Ready | Report honest freshness and batch outcomes |
-| BL-022 | bug | P1 | M | Ready | Keep direction in flight history identity |
+| BL-022 | bug | P1 | M | Testing | Keep direction in flight history identity |
 | BL-023 | bug | P2 | S | Ready | Preserve labels and saved filter state (label part done; city and stale filters still open) |
 | BL-024 | bug | P2 | M | Ready | Share actual current state and retained route |
 | BL-025 | bug | P1 | M | Ready | Guard against false drops from partial feeds |
