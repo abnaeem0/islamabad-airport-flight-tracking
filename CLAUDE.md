@@ -34,7 +34,7 @@ Data flow: PAA API -> collector (flatten, normalise flight number, compare with 
 - **Dropped** means "vanished from the feed", not confirmed cancellation. Never present stale or partial data as fresh.
 - **Airport board data is not aircraft position.** Do not invent estimated arrival times unless a rule is agreed.
 - **Secrets:** DB credentials are environment variables only. The Supabase publishable key in the JS is fine; a service or secret key must never be committed.
-- Postgres folds unquoted `ST`/`ET` to lowercase, so JS and `RealDictCursor` use `st`/`et`.
+- Postgres folds unquoted `ST`/`ET` to lowercase, so JS and `RealDictCursor` use `st`/`et`. In SQL write them as plain `st` and `et`; quoting them as `"ST"` fails (the columns are lowercase).
 
 ## 4. Database (public-safe summary)
 
@@ -47,6 +47,7 @@ Data flow: PAA API -> collector (flatten, normalise flight number, compare with 
 | `origin_snapshots` | new change history; bigint id; indexed by source-aware lookup and `scraped_at` |
 | `origin_scraper_status` | new health; row `scraper_id=paa_origin` |
 | `source_priority` | source registry; `data_source`, `priority`. Rows (2026-11-02): `paa` 10 (in use), `airline_web` 20 and `adsb` 30 (registered, no collector yet) |
+| `isb_arrival_origin_view` | applied 2026-11-04: pairs each Islamabad arrival with the departure leg from the origin airport (rules in PLAN.md section 5); not in the repo as a file, SQL is in PLAN.md |
 | `flight_canonical_view` | ranks sources, splits departure and arrival legs, `FULL JOIN` on number, origin city, destination city and date |
 
 Limits of the view: overnight flights (legs on different dates) do not pair; wrong-airport rows can multiply results; ties in priority are not resolved deterministically; international flights have no origin side. Do not "fix" it with an unrestricted +/-1 day join, which pairs daily flights wrongly (BL-019).
