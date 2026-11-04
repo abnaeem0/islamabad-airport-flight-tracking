@@ -221,14 +221,14 @@ CREATE OR REPLACE VIEW public.isb_arrival_origin_view
 WITH (security_invoker = true) AS
 WITH base AS (
   SELECT f.*, sp.priority,
-         CASE WHEN f."ST" ~ '^\d{1,2}:\d{2}' THEN
-           (f.scheduled_date + substring(f."ST" from '^\d{1,2}:\d{2}')::time) END AS st_ts
+         CASE WHEN f.st ~ '^\d{1,2}:\d{2}' THEN
+           (f.scheduled_date + substring(f.st from '^\d{1,2}:\d{2}')::time) END AS st_ts
   FROM public.origin_flights f
   JOIN public.source_priority sp USING (data_source)
 ),
 arr AS (   -- best-ranked Islamabad arrival row per flight/date
   SELECT DISTINCT ON (flight_number, scheduled_date)
-         flight_number, scheduled_date, origin_city, status, "ST", "ET", st_ts,
+         flight_number, scheduled_date, origin_city, status, st, et, st_ts,
          data_source, last_checked
   FROM base
   WHERE type = 'Arrival' AND source_airport = 'Islamabad'
@@ -236,7 +236,7 @@ arr AS (   -- best-ranked Islamabad arrival row per flight/date
 ),
 dep AS (   -- best-ranked departure row per flight/date/airport reported by the origin airport
   SELECT DISTINCT ON (flight_number, scheduled_date, source_airport)
-         flight_number, scheduled_date, source_airport, destination_city, status, "ST", "ET",
+         flight_number, scheduled_date, source_airport, destination_city, status, st, et,
          st_ts, data_source, last_checked, last_updated
   FROM base
   WHERE type = 'Departure' AND source_airport <> 'Islamabad' AND destination_city = 'Islamabad'
@@ -265,11 +265,11 @@ pairs AS (  -- mutual best only
 SELECT a.flight_number,
        a.scheduled_date AS arrival_date,
        a.origin_city,
-       a.status   AS arrival_status, a."ST" AS arrival_st, a."ET" AS arrival_et,
+       a.status   AS arrival_status, a.st AS arrival_st, a.et AS arrival_et,
        a.last_checked AS arrival_checked,
        p.dep_date AS departure_date,
        d.source_airport AS departure_airport,
-       d.status   AS departure_status, d."ST" AS departure_st, d."ET" AS departure_et,
+       d.status   AS departure_status, d.st AS departure_st, d.et AS departure_et,
        d.data_source AS departure_source,
        d.last_checked AS departure_checked,
        d.last_updated AS departure_last_updated,
@@ -289,7 +289,7 @@ WITH (security_invoker = true) AS
 SELECT DISTINCT ON (f.flight_number, f.scheduled_date, f.type)
        f.flight_number, f.scheduled_date, f.type,
        CASE WHEN f.type = 'Arrival' THEN f.origin_city ELSE f.destination_city END AS city,
-       f.status, f."ST" AS st, f."ET" AS et, f.nature, f.airline_logo,
+       f.status, f.st AS st, f.et AS et, f.nature, f.airline_logo,
        f.data_source, f.last_checked, f.last_updated
 FROM public.origin_flights f
 JOIN public.source_priority sp USING (data_source)
@@ -300,7 +300,7 @@ CREATE OR REPLACE VIEW public.isb_snapshots_view
 WITH (security_invoker = true) AS
 SELECT s.id, s.flight_number, s.scheduled_date, s.type,
        CASE WHEN s.type = 'Arrival' THEN s.origin_city ELSE s.destination_city END AS city,
-       s.status, s."ST" AS st, s."ET" AS et, s.nature,
+       s.status, s.st AS st, s.et AS et, s.nature,
        s.data_source, s.scraped_at, s.change_type
 FROM public.origin_snapshots s
 WHERE s.source_airport = 'Islamabad';
@@ -315,6 +315,9 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-04 | Claude | SQL column-name fix
+- Found: the owner's database has lowercase `st`/`et` columns (unquoted `ST` folds to lowercase); my first SQL quoted `"ST"` and failed with 42703. Fixed both view scripts and re-tested on a lowercase schema. Lesson: do not quote `ST`/`ET` in SQL (see CLAUDE.md section 3).
 
 ### 2026-11-03 | Claude | origin switch prepared
 - Done: BL-032 and BL-022 prepared on a branch: two Islamabad-only views (tested on a local Postgres), site readers switched, history links carry direction, freshness read from the origin status row, origin collector always fetches yesterday for Islamabad; 11 browser checks and 6 plan checks pass. Removed accidentally committed `__pycache__` and ignored it.
