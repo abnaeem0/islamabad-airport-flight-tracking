@@ -8,7 +8,7 @@ Only these two doc files exist (D-013). Do not create others. This repo is **pub
 A public flight-status site for **Islamabad International Airport** (Islamabad only, D-007).
 Audience: people in Islamabad, travellers coming in, the people picking them up, and hotel/transport staff.
 It polls the Pakistan Airports Authority (PAA) API, keeps current state per flight, records a snapshot only when something changes, and shows status plus change history.
-Planned feature: for domestic flights landing in Islamabad, the details page shows what the departure airport reports (e.g. "Departed Lahore 14:52"), with its own source and freshness. That is not built yet (BL-010).
+For domestic flights landing in Islamabad, the details page also shows what the departure airport reports, with its own source and freshness, in one card under Islamabad's line (BL-010C, BL-036).
 
 ## 2. Architecture (verified against the repo on 2026-11-01)
 
@@ -21,7 +21,7 @@ Planned feature: for domestic flights landing in Islamabad, the details page sho
 | Scheduler | Workflows `.github/workflows/scrape.yml` and `origin_scraper.yml` are **manual-trigger only** (cron blocks commented out). An external cron-job.org job dispatches them, reported by owner as every 15 minutes. Python 3.11, secrets `DB_HOST DB_NAME DB_USER DB_PASSWORD DB_PORT` | |
 | Source | `https://paaconnectapi.paa.gov.pk/api/flights/{date}/{Arrival|Departure}/{city}`, unofficial, TLS verification disabled in both collectors (BL-027) | |
 
-**Website reads the original tables only.** `origin_*` tables and the view `flight_canonical_view` exist and fill, but no page uses them.
+**Website reads the origin tables** through `isb_flights_view`, `isb_snapshots_view` and `isb_arrival_origin_view` (plus `origin_snapshots` for the "first seen departed" line), and falls back to the old `flights` / `flight_snapshots` tables if a view errors (BL-032). `flight_canonical_view` is not used by any page.
 Data flow: PAA API -> collector (flatten, normalise flight number, compare with stored row) -> upsert current row, insert snapshot on change -> a non-terminal flight missing from a non-empty feed becomes `Dropped` -> browser queries Supabase.
 
 ## 3. Conventions

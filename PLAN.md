@@ -6,7 +6,7 @@ Public repo: no email, phone, credentials or security details in this file.
 
 ## 1. Current handoff
 
-- **Goal now:** switch on the contact form (needs the owner's key), delete the old doc files, then pick one small task.
+- **Goal now:** live-check the BL-036 details card, switch on the contact form (needs the owner's key), then pick one small task.
 - **Owner reports:** everything is working; both collectors are running; an external cron-job.org job dispatches both workflows about every 15 minutes.
 - **Site fixes live since 2026-11-01:** 7 files under `docs/` merged to `main` (PR #5, commit `9d4e72f`). Checked in a local headless browser against a stubbed database (18 checks pass; the same checks fail on the old files) and, per the owner's report on 2026-11-01, **checked on the live site**. The contact form is applied but **not switched on** (no access key yet).
 - **Checked in the repo on 2026-11-01 (code evidence, not runtime):**
@@ -19,8 +19,8 @@ Public repo: no email, phone, credentials or security details in this file.
 - **Owner decisions:** Islamabad only; origin context for domestic arrivals; free Supabase; ingestion matters more than long history; no public email or phone (use a contact form); two doc files only.
 - **Not seen yet:** recent run logs; the cron-job.org settings; whether the BL-017 fix has been applied (the 2026-11-02 check shows it was still needed).
 - **Verified 2026-11-02 (owner ran read-only queries):** `source_priority` holds `paa` (priority 10, in use), `airline_web` (20) and `adsb` (30), the last two registered with no collector yet. `scraped_at` is stored as UTC (latest value 3 minutes behind UTC now), so the details page's UTC-to-PKT display is right and BL-009's open question is closed. `origin_scraper_status.last_run` was 7 minutes old, consistent with the ~15-minute dispatch. BL-017 is still needed (details kept private).
-- **Owner setup, left for later:** (1) create a free Web3Forms access key and paste it into `docs/contact.html` (BL-028), then send a test message; (2) run the private BL-017 fix and re-run the permission check; (3) cron-job.org settings for BL-001; (4) delete the old doc files and close draft PR #4 (section 6).
-- **Docs migration:** delete the old doc files listed in section 6 after saving these two (history stays in git). `docs/` is the published website folder, so the old `.md` files there are publicly served.
+- **Owner setup, left for later:** (1) create a free Web3Forms access key and paste it into `docs/contact.html` (BL-028), then send a test message; (2) run the private BL-017 fix and re-run the permission check; (3) cron-job.org settings for BL-001.
+- **Docs migration done 2026-11-04:** old doc files deleted (history stays in git), README is a pointer, draft PR #4 closed.
 - **Prepared 2026-11-02, not merged:** (1) branch `origin-box-2026-11-02`: details-page departure-airport box plus this documentation; (2) a separate scraper branch for PKT dates and the early-morning yesterday window (BL-002, BL-031). Order for the owner: apply the BL-010B view SQL first, check it, then merge the website branch; merge the scraper branch separately and watch one run's log.
 - **Live 2026-11-04:** BL-010B view applied and checked (133 matched). The two BL-032 views were run ("no rows returned", which is normal for a CREATE); their existence is not yet confirmed by a query. PR #10 is still not merged, so the site still reads the old tables.
 - **BL-032 switch (merged 2026-11-04, owner away, by the owner's instruction):** search, history and details read `isb_flights_view` / `isb_snapshots_view` and **fall back to the old tables** if a view errors, so the site works even if the view SQL was not applied. Rollback: revert the merge commit (the old tables and collector were never touched). Turn off the old Islamabad collector only after several days of side-by-side checks. Checked in a stubbed browser with views present and missing; not checked on the live site.
@@ -319,14 +319,14 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 
 ## 6. Repo tidy-up for the two-file switch
 
-After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
+**Done 2026-11-04.** Kept for reference. After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
 
 ### 2026-11-04 (late) | Claude | BL-036 journey card
 - Done: owner said the text sizes on the details page made it hard to tell what matters, and asked to fold the departure-airport box into the main flight view. Rebuilt the header as one card with a clear size ladder; Islamabad's current status and time now sit in the card (before, they were only in the history table). Added a note when Islamabad has moved the time but the departure board has not, and a "first seen departed" line from our own snapshots. 6 scenarios x 4 widths pass in a stubbed browser (no sideways scroll, hostile text escaped, view missing hides the line).
 - Not done: live check; BL-037 (needs a raw PAA response, which this environment cannot reach).
-- Next: merged on the owner's instruction (PR #11); owner opens one domestic and one international arrival on the live site. Draft PR #4 left open (section 6 says close it, not merge).
+- Next: merged on the owner's instruction (PR #11); owner opens one domestic and one international arrival on the live site. Then, on the owner's instruction, did the section 6 tidy-up: deleted the old doc files, README now a pointer, closed draft PR #4, brought CLAUDE.md up to date on what the site reads.
 
 ### 2026-11-04 (evening) | Claude | BL-032 merged with fallback
 - Done: owner left and asked for the website to go live if safe. Could not confirm the views exist (no database access from here), so added a fallback to the old tables for search, history and freshness, tested both cases in a stubbed browser (10 checks plus the earlier 11 and 15), tested the new fetch plan with a stubbed fetcher, and merged PR #10.
