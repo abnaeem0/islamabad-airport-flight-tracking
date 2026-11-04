@@ -370,11 +370,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ===== FETCH SCRAPER FRESHNESS =====
   async function fetchFreshness() {
     try {
-      const { data, error } = await client
+      let { data, error } = await client
         .from('origin_scraper_status')
         .select('last_run')
         .eq('scraper_id', 'paa_origin')
         .single();
+      if (error || !data) {
+        ({ data, error } = await client.from('scraper_status').select('last_run').eq('id', 1).single());
+      }
 
       if (error || !data) return;
       lastScrapeTime = data.last_run;
@@ -389,13 +392,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ===== FETCH SNAPSHOTS & RENDER =====
   async function fetchAndRender() {
     try {
-      let query = client
-        .from('isb_snapshots_view')
-        .select('*')
-        .eq('flight_number', flightNumber)
-        .eq('scheduled_date', date);
-      if (typeParam === 'Arrival' || typeParam === 'Departure') query = query.eq('type', typeParam);
-      const { data: allSnaps, error } = await query.order('scraped_at', { ascending: true });
+      // Reads the origin-based view; if it is missing or errors, falls back to the original table
+      const loadSnaps = (table) => {
+        let q = client.from(table).select('*')
+          .eq('flight_number', flightNumber)
+          .eq('scheduled_date', date);
+        if (typeParam === 'Arrival' || typeParam === 'Departure') q = q.eq('type', typeParam);
+        return q.order('scraped_at', { ascending: true });
+      };
+      let { data: allSnaps, error } = await loadSnaps('isb_snapshots_view');
+      if (error) {
+        console.warn('isb_snapshots_view unavailable, using flight_snapshots', error);
+        ({ data: allSnaps, error } = await loadSnaps('flight_snapshots'));
+      }
 
       if (error) throw error;
 

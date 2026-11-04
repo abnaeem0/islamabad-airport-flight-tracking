@@ -23,7 +23,7 @@ Public repo: no email, phone, credentials or security details in this file.
 - **Docs migration:** delete the old doc files listed in section 6 after saving these two (history stays in git). `docs/` is the published website folder, so the old `.md` files there are publicly served.
 - **Prepared 2026-11-02, not merged:** (1) branch `origin-box-2026-11-02`: details-page departure-airport box plus this documentation; (2) a separate scraper branch for PKT dates and the early-morning yesterday window (BL-002, BL-031). Order for the owner: apply the BL-010B view SQL first, check it, then merge the website branch; merge the scraper branch separately and watch one run's log.
 - **Live 2026-11-04:** BL-010B view applied and checked (133 matched). The two BL-032 views were run ("no rows returned", which is normal for a CREATE); their existence is not yet confirmed by a query. PR #10 is still not merged, so the site still reads the old tables.
-- **Prepared 2026-11-03 (PR open, not merged):** BL-032 switch. Apply the view SQL (section 5, "BL-032 views") first, then merge. Rollback: revert the PR (the site goes back to the old tables, which keep filling). Turn off the old Islamabad collector only after several days of side-by-side checks.
+- **BL-032 switch (merged 2026-11-04, owner away, by the owner's instruction):** search, history and details read `isb_flights_view` / `isb_snapshots_view` and **fall back to the old tables** if a view errors, so the site works even if the view SQL was not applied. Rollback: revert the merge commit (the old tables and collector were never touched). Turn off the old Islamabad collector only after several days of side-by-side checks. Checked in a stubbed browser with views present and missing; not checked on the live site.
 - **Suggested next sequence:** BL-017 (private evidence) -> switch on the contact form (BL-028 key) -> BL-002 -> BL-010A (validate origin data) -> BL-021 / BL-022 -> BL-010B/C. A newly observed outage goes first.
 
 ## 2. Spec
@@ -97,7 +97,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-033 | bug | P1 | S | Inbox | Multan returns HTTP 500 from the PAA API on every run, so Multan has no rows at all; the Multan collection is wasted calls and Multan-origin flights never pair |
 | BL-034 | feature | P2 | M | Inbox | Add more origin airports? About 76% of Islamabad arrivals come from airports we do not watch (international and other Pakistani cities); decide which to add once the city list is known |
 | BL-035 | research | P2 | S | Inbox | Explain 9 unmatched arrivals from watched airports that do have departure rows (missing rows for today's flights; PA204 numbering; PK368 8 h gap) |
-| BL-032 | feature | P1 | M | Proposed | Switch search, history and details to the origin tables via two Islamabad-only views; always fetch yesterday for Islamabad (D-015). PR open, not merged; needs the view SQL applied first |
+| BL-032 | feature | P1 | M | Testing | Switch search, history and details to the origin tables via two Islamabad-only views, with fallback to the old tables; always fetch yesterday for Islamabad (D-015). Merged 2026-11-04 (PR #10); live checks pending |
 | BL-011 | feature | P3 | L | Inbox | Flight-change notifications |
 | BL-012 | feature | P3 | M | Inbox | Adaptive scrape frequency |
 | BL-013 | chore | P3 | M | Inbox | Batch database work where measured |
@@ -319,6 +319,11 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-04 (evening) | Claude | BL-032 merged with fallback
+- Done: owner left and asked for the website to go live if safe. Could not confirm the views exist (no database access from here), so added a fallback to the old tables for search, history and freshness, tested both cases in a stubbed browser (10 checks plus the earlier 11 and 15), tested the new fetch plan with a stubbed fetcher, and merged PR #10.
+- Not done: live checks (owner tomorrow); the follow-up queries on missing cities and the 9 unpaired flights; BL-017.
+- Next: owner opens a search page and a details page, runs the view-exists query and the two follow-up queries.
 
 ### 2026-11-04 | Claude | live results recorded
 - Done: recorded the owner's query results (column types, match counts and reasons, coverage); read the latest origin run log (Multan HTTP 500); added BL-033, BL-034, BL-035.
