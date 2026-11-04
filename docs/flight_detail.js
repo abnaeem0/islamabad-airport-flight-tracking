@@ -119,6 +119,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // "15:55" or "15:55:00" -> minutes since midnight; anything else -> null
+  function toMinutes(t) {
+    const m = /^(\d{1,2}):(\d{2})/.exec(String(t || '').trim());
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  }
+
+  // Expected minus scheduled, in minutes (wraps past midnight); null if either is unreadable
+  function minutesDiff(st, et) {
+    const a = toMinutes(st), b = toMinutes(et);
+    if (a === null || b === null) return null;
+    let d = b - a;
+    if (d > 720)  d -= 1440;
+    if (d < -720) d += 1440;
+    return d;
+  }
+
+  function diffText(d) {
+    if (d === null || d === 0) return '';
+    const n = Math.abs(d);
+    const txt = n >= 60 ? `${Math.floor(n / 60)} h ${n % 60 ? (n % 60) + ' min' : ''}`.trim() : `${n} min`;
+    return d < 0 ? `${txt} early` : `${txt} late`;
+  }
+
+  // Colour group for a board status (display only; the text itself is always shown as-is)
+  function statusTone(status) {
+    const s = String(status || '').toLowerCase();
+    if (!s)                                   return 'none';
+    if (/cancel/.test(s))                     return 'bad';
+    if (/drop/.test(s))                       return 'muted';
+    if (/land|arriv/.test(s))                 return 'good';
+    if (/delay|late/.test(s))                 return 'warn';
+    if (/advanc|early/.test(s))               return 'info';
+    if (/depart|airborne|take/.test(s))       return 'info';
+    return 'neutral';
+  }
+
+  function statusPill(status, small) {
+    return `<span class="status-pill status-pill--${statusTone(status)}${small ? ' status-pill--sm' : ''}">${display(status || 'No status')}</span>`;
+  }
+
+  // One airport's line: big time (expected if it differs, else scheduled), status, and the sub-line
+  function legHtml({ label, st, et, status, small, extraDate }) {
+    const d       = minutesDiff(st, et);
+    const hasEt   = et != null && String(et).trim() !== '' && String(et).trim() !== String(st || '').trim();
+    const bigTime = hasEt ? et : st;
+    const kind    = hasEt ? 'Expected' : 'Scheduled';
+    const dtxt    = diffText(d);
+    const sub = hasEt
+      ? `Expected · scheduled ${display(st)}${extraDate ? ' (' + display(extraDate) + ')' : ''}${dtxt ? ` · <strong class="delta delta--${d < 0 ? 'early' : 'late'}">${esc(dtxt)}</strong>` : ''}`
+      : `${kind}${extraDate ? ' · ' + display(extraDate) : ''} · no expected time posted`;
+    return `
+      <div class="leg ${small ? 'leg--secondary' : 'leg--primary'}">
+        <p class="leg-label">${label}</p>
+        <div class="leg-main">
+          <span class="leg-time">${display(bigTime)}</span>
+          ${statusPill(status, small)}
+        </div>
+        <p class="leg-sub">${sub}</p>
+      </div>`;
+  }
+
+  function prettyDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    if (!m) return display(iso);
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return esc(d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }));
+  }
+
   // ===== STATE =====
   let lastScrapeTime = null;
 
@@ -289,7 +357,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       openShareModal(text);
     });
 
-    flightInfoDiv.appendChild(btn);
+    (flightInfoDiv.querySelector('.fi-head') || flightInfoDiv).appendChild(btn);
   }
 
   // ===== RENDER SNAPSHOTS =====
@@ -328,7 +396,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     return (Date.now() - new Date(dateStr).getTime()) / 60000;
   }
 
-  function renderOriginBox(row) {
+  // isbLeg: latest Islamabad snapshot, used to spot when the two boards disagree
+  function renderOriginBox(row, isbLeg, departedAt) {
     if (!originBox) return;
     if (!row || row.match_state !== 'matched') { hideOriginBox(); return; }
 
@@ -337,21 +406,50 @@ document.addEventListener('DOMContentLoaded', async () => {
       ? `${esc(timeAgo(row.departure_checked))} (${esc(formatPKT(row.departure_checked))} PKT)`
       : 'unknown';
     const overnight = row.departure_date && row.departure_date !== row.arrival_date;
+    const source = row.departure_source === 'paa' ? 'Pakistan Airports Authority' : row.departure_source;
+
+    // Islamabad has moved the arrival time, but the departure airport shows nothing beyond the schedule
+    const isbShift   = isbLeg ? minutesDiff(isbLeg.st, isbLeg.et) : null;
+    const depHasEt   = row.departure_et != null && String(row.departure_et).trim() !== ''
+                       && String(row.departure_et).trim() !== String(row.departure_st || '').trim();
+    const depLeft    = /depart|airborne|take/i.test(row.departure_status || '');
+    const disagree   = isbShift !== null && Math.abs(isbShift) >= 5 && !depHasEt && !depLeft;
 
     originBox.innerHTML = `
-      <h2>From ${display(row.departure_airport)}</h2>
-      <p class="origin-status">${display(row.departure_status)}</p>
-      <p>Scheduled departure: ${display(row.departure_st)}${overnight ? ' (' + display(row.departure_date) + ')' : ''}</p>
-      <p>Expected departure: ${display(row.departure_et)}</p>
-      <p class="origin-meta">Source: ${display(row.departure_source === 'paa' ? 'Pakistan Airports Authority departure board' : row.departure_source)}.
-        Last checked ${checked}.</p>
-      ${stale ? '<p class="origin-warn">This information may be out of date.</p>' : ''}
-      <p class="origin-meta">Airport board information, not the aircraft's position.</p>
+      ${legHtml({
+        label: `${display(row.departure_airport)} · departure board`,
+        st: row.departure_st, et: row.departure_et, status: row.departure_status,
+        small: true, extraDate: overnight ? row.departure_date : null,
+      })}
+      ${departedAt ? `<p class="leg-note">This board first showed it departed at ${esc(formatPKT(departedAt))} PKT. We check about every 15 minutes, so it left at or before then.</p>` : ''}
+      ${disagree ? `<p class="leg-note leg-note--warn">Islamabad's board has changed the arrival time (${esc(diffText(isbShift))}), but ${display(row.departure_airport)}'s board has not posted a departure update. The two airports update their boards separately, so they can disagree for a while.</p>` : ''}
+      <p class="leg-meta">Source: ${display(source)} · checked ${checked}</p>
+      ${stale ? `<p class="leg-note leg-note--warn">${display(row.departure_airport)} information may be out of date.</p>` : ''}
     `;
     originBox.hidden = false;
   }
 
-  async function fetchOriginBox(flightType) {
+  // When the departure board first showed "Departed" (our own observation time, not the take-off time)
+  async function fetchDepartedAt(row) {
+    try {
+      const { data, error } = await client
+        .from('origin_snapshots')
+        .select('scraped_at,status')
+        .eq('flight_number', row.flight_number)
+        .eq('scheduled_date', row.departure_date)
+        .eq('type', 'Departure')
+        .eq('source_airport', row.departure_airport)
+        .ilike('status', '%depart%')
+        .order('scraped_at', { ascending: true })
+        .limit(1);
+      if (error || !data || !data.length) return null;
+      return data[0].scraped_at;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function fetchOriginBox(flightType, isbLeg) {
     if (flightType !== 'Arrival') { hideOriginBox(); return; }
     try {
       const { data, error } = await client
@@ -361,7 +459,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         .eq('arrival_date', date)
         .limit(1);
       if (error || !data || !data.length) { hideOriginBox(); return; }
-      renderOriginBox(data[0]);
+      const row = data[0];
+      const departedAt = row.match_state === 'matched' ? await fetchDepartedAt(row) : null;
+      renderOriginBox(row, isbLeg, departedAt);
     } catch (e) {
       hideOriginBox();
     }
@@ -419,16 +519,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      // Populate flight header (only once)
-      if (flightInfoDiv.querySelector('#flight-number') === null) {
-        const first = snapshots[0];
-        flightInfoDiv.innerHTML = `
-          <p id="flight-number">Flight: ${display(first.flight_number)}</p>
-          <p id="flight-date">Date: ${display(first.scheduled_date)}</p>
-          <p id="flight-type">Type: ${display(first.type)}</p>
-          <p id="flight-city">${first.type === 'Arrival' ? 'From' : 'To'}: ${display(first.city)}</p>
-        `;
-      }
+      // Flight header: who, when, route, then Islamabad's current board line (re-drawn each refresh)
+      const first     = snapshots[0];
+      const latest    = snapshots[snapshots.length - 1];
+      const isArrival = first.type === 'Arrival';
+      const airline   = getAirlineInfo(flightNumber);
+      const city      = display(latest.city || first.city);
+      flightInfoDiv.innerHTML = `
+        <div class="fi-head">
+          <p class="fi-eyebrow">
+            ${airline.name !== 'Airline' ? `<span>${esc(airline.name)}</span> · ` : ''}<span id="flight-date">${prettyDate(first.scheduled_date)}</span>
+          </p>
+          <p class="fi-number" id="flight-number">${display(first.flight_number)}</p>
+          <p class="fi-route" id="flight-city">${isArrival ? `${city} <span aria-hidden="true">→</span><span class="sr-only"> to </span> Islamabad` : `Islamabad <span aria-hidden="true">→</span><span class="sr-only"> to </span> ${city}`}</p>
+          <p class="sr-only" id="flight-type">${display(first.type)}</p>
+        </div>
+        ${legHtml({
+          label: `Islamabad · ${isArrival ? 'arrival' : 'departure'}`,
+          st: latest.st, et: latest.et, status: latest.status, small: false,
+        })}
+      `;
 
       // Always ensure modal exists in DOM, then re-inject button with fresh snapshot closure
       injectShareModal();
@@ -437,7 +547,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       injectShareButton(snapshots);
 
       renderSnapshots(snapshots);
-      await fetchOriginBox(snapshots[0].type);
+      await fetchOriginBox(first.type, latest);
 
     } catch (err) {
       console.error(err);
