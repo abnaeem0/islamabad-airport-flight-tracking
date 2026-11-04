@@ -66,15 +66,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Airline Logos ---
-  const LOCAL_AIRLINES = ['PK', 'PF', '9P', 'PA'];
-  const REPO_LOGOS     = 'https://abnaeem0.github.io/islamabad-airport-flight-tracking/logos/';
+  // Logos kept in docs/logos/ (lower-case IATA code + .png). Any other airline tries
+  // pics.avs.io, and if that fails too the card shows the two-letter code instead,
+  // so the card layout never shifts.
+  const LOCAL_LOGOS = new Set(['3L', '9P', 'B9', 'BA', 'CA', 'CZ', 'EK', 'ER', 'ET', 'EY', 'F3', 'FG', 'FZ', 'G9', 'GF', 'HY', 'IA', 'J2', 'J9', 'KA', 'KU', 'MS', 'O3', 'OV', 'PA', 'PF', 'PK', 'QR', 'RQ', 'SV', 'SZ', 'TG', 'TK', 'W5', 'WY', 'XY']);
+
+  function airlineCode(flightNumber) {
+    return String(flightNumber || '').slice(0, 2).toUpperCase();
+  }
 
   function getLogoUrl(flightNumber) {
-    const code = flightNumber.slice(0, 2).toUpperCase();
-    if (LOCAL_AIRLINES.includes(code)) {
-      return `${REPO_LOGOS}${code.toLowerCase()}.png`;
-    }
-    return `https://pics.avs.io/60/60/${code}.png`;
+    const code = airlineCode(flightNumber);
+    if (LOCAL_LOGOS.has(code)) return `logos/${code.toLowerCase()}.png`;
+    return `https://pics.avs.io/60/60/${encodeURIComponent(code)}.png`;
+  }
+
+  function makeLogo(flightNumber) {
+    const img = document.createElement('img');
+    img.src     = getLogoUrl(flightNumber);
+    img.alt     = flightNumber + ' logo';
+    img.width   = 40;
+    img.height  = 40;
+    img.onerror = function() {
+      const badge = document.createElement('span');
+      badge.className   = 'logo-fallback';
+      badge.textContent = airlineCode(flightNumber) || '✈';
+      badge.setAttribute('aria-hidden', 'true');
+      this.replaceWith(badge);
+    };
+    return img;
   }
 
   // --- Search ---
@@ -140,12 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = document.createElement('div');
         card.className = 'flight-card';
 
-        const img = document.createElement('img');
-        img.src     = getLogoUrl(f.flight_number);
-        img.alt     = f.flight_number + ' logo';
-        img.width   = 40;
-        img.height  = 40;
-        img.onerror = function() { this.style.display = 'none'; };
+        const img = makeLogo(f.flight_number);
 
         const info = document.createElement('div');
         info.innerHTML = `

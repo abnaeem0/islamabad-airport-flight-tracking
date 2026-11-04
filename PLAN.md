@@ -1,11 +1,12 @@
 # PLAN.md: Islamabad Flight Tracker
 
 Spec, decisions, backlog, journal and the current handoff, in one place. Stable rules and architecture are in `CLAUDE.md`.
-This merges the repo's earlier doc set (`AGENTS.md`, `docs/SPEC|BACKLOG|DECISIONS|JOURNAL|DB|WORKFLOW.md`, dated 2026-09-30) and keeps its task IDs. Last updated: 2026-11-01.
+This merges the repo's earlier doc set (`AGENTS.md`, `docs/SPEC|BACKLOG|DECISIONS|JOURNAL|DB|WORKFLOW.md`, dated 2026-09-30) and keeps its task IDs. Last updated: 2026-11-04.
 Public repo: no email, phone, credentials or security details in this file.
 
 ## 1. Current handoff
 
+- **BL-039 (PR open 2026-11-04, not merged):** airline logos for the ~33 airlines that serve Islamabad, a code badge when a logo is missing (cards no longer shift), and corrected flight-check links and helplines in the share text. Owner: click the PIA status link once (it could not be checked from here), then merge.
 - **Goal now:** live-check the BL-036 details card, switch on the contact form (needs the owner's key), then pick one small task.
 - **Owner reports:** everything is working; both collectors are running; an external cron-job.org job dispatches both workflows about every 15 minutes.
 - **Site fixes live since 2026-11-01:** 7 files under `docs/` merged to `main` (PR #5, commit `9d4e72f`). Checked in a local headless browser against a stubbed database (18 checks pass; the same checks fail on the old files) and, per the owner's report on 2026-11-01, **checked on the live site**. The contact form is applied but **not switched on** (no access key yet).
@@ -76,7 +77,7 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-039**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-040**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -101,6 +102,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-035 | research | P2 | S | Inbox | Explain 9 unmatched arrivals from watched airports that do have departure rows (missing rows for today's flights; PA204 numbering; PK368 8 h gap) |
 | BL-036 | feature | P1 | S | Testing | Details page as one journey card: flight number, then Islamabad's line (large), then the departure airport's line (smaller), with early/late wording, "first seen departed" time and a note when the two boards disagree. Merged 2026-11-04 (PR #11); checked in a stubbed browser (6 scenarios x 4 widths), live check pending |
 | BL-038 | research | P2 | S | Testing | Owner test: is the details-page history clearer with both airports in one place? Adding `&layout=list` (one time-ordered list, each row labelled with its airport) or `&layout=columns` (departure board and Islamabad side by side) to a details link shows a test switcher; without it the page is unchanged. Owner picks one; then make it the default and remove the switcher and the unused layouts |
+| BL-039 | bug | P1 | S | Proposed | Share text and logos: correct FlightStats links for every airline, airline status pages and helplines checked against the airlines' own sites, local logos for airlines serving Islamabad, missing logo shows the airline code without shifting the card. PR open, checked in a stubbed browser; live check pending |
 | BL-037 | research | P2 | S | Inbox | Departure boards rarely show when a flight actually left: owner saw Islamabad say "Advanced" (30 min early) while Karachi showed only the scheduled time. Check one raw PAA departure response for fields the collector drops (it keeps only ST, ET, remarks), and how ET/remarks change after take-off |
 | BL-032 | feature | P1 | M | Testing | Switch search, history and details to the origin tables via two Islamabad-only views, with fallback to the old tables; always fetch yesterday for Islamabad (D-015). Merged 2026-11-04 (PR #10); live checks pending |
 | BL-011 | feature | P3 | L | Inbox | Flight-change notifications |
@@ -125,6 +127,13 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-030 | bug | P2 | S | Done | Flight details page layout: unstyled header, table overflow, unreadable share links |
 
 ### Task records
+
+**BL-039** *New 2026-11-04.* Owner: share links should open the right page with the right contact details for every airline; a missing logo used to misalign the card.
+- Found: the card hid a failed logo (`display:none`), so in the 3-column grid the text slid into the logo column and the button into the text column (not fixed before). FlightStats links were wrong for any airline not in the 4-airline table whose code contains a digit (3L123 gave `/L/123`, G9512 gave `/G/9512`) and used the IATA code where FlightStats needs another (flyadeal FAD, SalamAir OMS, SereneAir SEP, Aero Nomad ANK, Somon Air SMR, Air Arabia Abu Dhabi 3L*). Airblue's status link was an old address (now `airblue.com/flightinfo/status`), AirSial's pointed to "manage reservation" (now `airsial.com/flight-status`), AirSial's helpline was not the one on its own call-centre page. Aircraft-registration "flight numbers" (APESL) produced a broken FlightStats link; now omitted. The shared page link kept the `&layout=` test switch; now removed.
+- Changed: `docs/script.js` (logo list, code badge fallback, relative `logos/` path), `docs/style.css` (fixed 40 px logo column, badge style), `docs/flight_detail.js` (airline table with names for 35 airlines, FlightStats codes, checked status pages and helplines for PK/PA/9P/PF, plus Emirates and Etihad status pages), `docs/logos/` (32 new logos, flattened on white to match the existing four; from the public Jxck-S/airline-logos collection, for identification).
+- Airline list from Islamabad's published airline table (March 2026) and a route site; the live feed was not reachable from the working environment, so an airline missing from the table still works (code badge, FlightStats by IATA code), just without a logo or name.
+- Accept: every card's text starts at the same x position with and without logos (checked 320/375/768/1280 px, 11 flights incl. unknown codes and a registration); share text for PK, PA, PF, 3L, F3, APESL, ZZ gives the expected links; no sideways scroll. Still to check live: one share per domestic airline, click each link, and the PIA link (`book-pia.crane.aero`, not reachable from here).
+- Known limit: FlightStats link uses the Islamabad date; for an overnight international arrival FlightStats may open the next day's flight.
 
 **BL-001** Record sanitised cron-job.org settings (target, ref, interval, retries) and the latest outcomes of both workflows. Do not recreate the workflow files. Accept: settings and latest coverage/failure evidence recorded, owner reports kept separate from log checks. Note: the origin job has a 22-minute timeout but is dispatched every ~15 minutes, so overlap is possible (BL-026).
 
@@ -324,6 +333,11 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 **Done 2026-11-04.** Kept for reference. After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-04 (night, later) | Claude | BL-039 share links and logos
+- Done: owner asked to check that share links lead to the right page and contact info for every airline, and to add missing logos (and check the misaligned-card bug). The card bug was still there; fixed. Corrected the FlightStats rule and codes, Airblue and AirSial status links, AirSial helpline; added names and logos for the airlines that serve Islamabad. Stubbed-browser checks pass at 4 widths. PR opened, not merged.
+- Not done: PIA status link not verifiable from here; foreign airlines have no helpline (Pakistan numbers not checked) and only Emirates and Etihad have their own status link.
+- Next: owner clicks through one share per domestic airline on the live site after merging.
 
 ### 2026-11-04 (night) | Claude | BL-038 history layout test
 - Done: owner asked whether the history would be easier with both boards in one place. Built two combined layouts behind `&layout=` so the owner can compare on real flights; the departure board's history now comes from one `origin_snapshots` read that also gives the "first seen departed" time. 45 stubbed-browser checks pass (4 flights x 3 layouts x 320/375/1280 px, plus the earlier set); the public page is unchanged without the parameter.
