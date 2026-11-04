@@ -5,6 +5,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const flightNumber = urlParams.get('flight');
   const date         = urlParams.get('date');
   const typeParam    = urlParams.get('type');   // 'Arrival' | 'Departure' | null (old links)
+  // History layout test (BL-038): only links carrying ?layout= show the switcher; everyone else sees 'separate'
+  const layoutParam  = urlParams.get('layout');
+  const LAYOUTS      = { separate: 'Separate', list: 'One list', columns: 'Side by side' };
+  const layout       = LAYOUTS[layoutParam] ? layoutParam : 'separate';
   const flightInfoDiv = document.getElementById('flight-info');
 
   if (!flightNumber || !date) {
@@ -382,6 +386,97 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // ===== HISTORY LAYOUTS (BL-038 test) =====
+  const historyTitle = document.querySelector('.section-title');
+  const tableEl      = document.getElementById('snapshot-table');
+  let   altHistory   = null;
+
+  function shortPKT(dateStr) {
+    const n = dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : dateStr + 'Z';
+    return new Date(n).toLocaleString('en-GB', {
+      timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+    });
+  }
+
+  function changeText(t) {
+    return { new: 'First seen', status_change: 'Status changed', time_change: 'Time changed',
+             city_change: 'City changed', dropped: 'Dropped from board' }[t] || 'Update';
+  }
+
+  // "Advanced · expected 15:25 · sched 15:55"
+  function boardLine(s) {
+    const hasEt = s.et != null && String(s.et).trim() !== '' && String(s.et).trim() !== String(s.st || '').trim();
+    return [s.status ? display(s.status) : null,
+            hasEt ? `expected ${display(s.et)}` : null,
+            `sched ${display(s.st)}`].filter(Boolean).join(' · ');
+  }
+
+  function renderSwitcher(hasDep) {
+    let sw = document.getElementById('layout-switch');
+    if (!layoutParam) { if (sw) sw.remove(); return; }
+    if (!sw) {
+      sw = document.createElement('nav');
+      sw.id = 'layout-switch';
+      sw.setAttribute('aria-label', 'History layout (test)');
+      historyTitle.parentNode.insertBefore(sw, historyTitle);
+    }
+    const link = key => { const u = new URLSearchParams(window.location.search); u.set('layout', key); return '?' + u.toString(); };
+    sw.innerHTML = `<span class="ls-label">Test view</span>` + Object.entries(LAYOUTS).map(([k, v]) =>
+      `<a href="${esc(link(k))}" class="${k === layout ? 'is-on' : ''}"${k === layout ? ' aria-current="true"' : ''}>${v}</a>`).join('')
+      + (hasDep ? '' : `<span class="ls-hint">No departure-airport history for this flight, so all three look alike.</span>`);
+  }
+
+  function renderHistory(isbSnaps, dep, isArrival) {
+    const depSnaps = dep && dep.snaps.length ? dep.snaps : null;
+    renderSwitcher(!!depSnaps);
+
+    if (layout === 'separate' || !depSnaps) {
+      if (altHistory) { altHistory.remove(); altHistory = null; }
+      tableEl.style.display = '';
+      historyTitle.textContent = `Islamabad board history`;
+      renderSnapshots(isbSnaps);
+      return;
+    }
+
+    tableEl.style.display = 'none';
+    if (!altHistory) {
+      altHistory = document.createElement('div');
+      altHistory.id = 'history-alt';
+      tableEl.parentNode.insertBefore(altHistory, tableEl.nextSibling);
+    }
+    const depName = display(dep.airport);
+    historyTitle.innerHTML = `Flight history · ${depName} and Islamabad`;
+
+    const rows = [
+      ...depSnaps.map(s => ({ ...s, side: 'dep' })),
+      ...isbSnaps.map(s => ({ ...s, side: 'isb' })),
+    ].sort((a, b) => new Date(a.scraped_at.endsWith('Z') || a.scraped_at.includes('+') ? a.scraped_at : a.scraped_at + 'Z')
+                   - new Date(b.scraped_at.endsWith('Z') || b.scraped_at.includes('+') ? b.scraped_at : b.scraped_at + 'Z'));
+
+    if (layout === 'list') {
+      altHistory.innerHTML = `<ol class="hl-list">${rows.map(r => `
+        <li class="hl-row hl-row--${r.side}">
+          <span class="hl-time">${esc(shortPKT(r.scraped_at))}</span>
+          <div class="hl-body">
+            <p><span class="hl-airport">${r.side === 'isb' ? 'Islamabad' : depName}</span>
+               <span class="hl-change">${changeText(r.change_type)}</span></p>
+            <p class="hl-detail">${boardLine(r)}</p>
+          </div>
+        </li>`).join('')}</ol>`;
+    } else {
+      altHistory.innerHTML = `
+        <table class="hc-table">
+          <thead><tr><th>Seen at</th><th class="hc-dep">${depName}<small>departure board</small></th><th class="hc-isb">Islamabad<small>${isArrival ? 'arrival' : 'departure'} board</small></th></tr></thead>
+          <tbody>${rows.map(r => `
+            <tr>
+              <td class="hc-time">${esc(shortPKT(r.scraped_at))}</td>
+              <td class="hc-dep">${r.side === 'dep' ? `<span class="hc-change">${changeText(r.change_type)}</span>${boardLine(r)}` : ''}</td>
+              <td class="hc-isb">${r.side === 'isb' ? `<span class="hc-change">${changeText(r.change_type)}</span>${boardLine(r)}` : ''}</td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+    }
+  }
+
   // ===== DEPARTURE AIRPORT BOX (domestic arrivals only) =====
   // Reads the view isb_arrival_origin_view (BL-010B). If the view is missing, empty or
   // unmatched, the box stays hidden and the rest of the page is unaffected.
@@ -429,28 +524,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     originBox.hidden = false;
   }
 
-  // When the departure board first showed "Departed" (our own observation time, not the take-off time)
-  async function fetchDepartedAt(row) {
+  // The departure board's change history for the paired leg (oldest first); [] if unreadable
+  async function fetchDepHistory(row) {
     try {
       const { data, error } = await client
         .from('origin_snapshots')
-        .select('scraped_at,status')
+        .select('scraped_at,status,st,et,change_type')
         .eq('flight_number', row.flight_number)
         .eq('scheduled_date', row.departure_date)
         .eq('type', 'Departure')
         .eq('source_airport', row.departure_airport)
-        .ilike('status', '%depart%')
-        .order('scraped_at', { ascending: true })
-        .limit(1);
-      if (error || !data || !data.length) return null;
-      return data[0].scraped_at;
+        .order('scraped_at', { ascending: true });
+      return (error || !data) ? [] : data;
     } catch (e) {
-      return null;
+      return [];
     }
   }
 
+  // Returns { airport, snaps } for a paired domestic arrival, otherwise null
   async function fetchOriginBox(flightType, isbLeg) {
-    if (flightType !== 'Arrival') { hideOriginBox(); return; }
+    if (flightType !== 'Arrival') { hideOriginBox(); return null; }
     try {
       const { data, error } = await client
         .from('isb_arrival_origin_view')
@@ -458,12 +551,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         .eq('flight_number', flightNumber)
         .eq('arrival_date', date)
         .limit(1);
-      if (error || !data || !data.length) { hideOriginBox(); return; }
+      if (error || !data || !data.length) { hideOriginBox(); return null; }
       const row = data[0];
-      const departedAt = row.match_state === 'matched' ? await fetchDepartedAt(row) : null;
-      renderOriginBox(row, isbLeg, departedAt);
+      if (row.match_state !== 'matched') { hideOriginBox(); return null; }
+      const depSnaps   = await fetchDepHistory(row);
+      const firstGone  = depSnaps.find(d => /depart/i.test(d.status || ''));
+      renderOriginBox(row, isbLeg, firstGone ? firstGone.scraped_at : null);
+      return { airport: row.departure_airport, snaps: depSnaps };
     } catch (e) {
       hideOriginBox();
+      return null;
     }
   }
 
@@ -546,8 +643,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (existingBtn) existingBtn.remove();
       injectShareButton(snapshots);
 
-      renderSnapshots(snapshots);
-      await fetchOriginBox(first.type, latest);
+      const dep = await fetchOriginBox(first.type, latest);
+      renderHistory(snapshots, dep, isArrival);
 
     } catch (err) {
       console.error(err);

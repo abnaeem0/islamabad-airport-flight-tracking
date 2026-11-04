@@ -1517,3 +1517,68 @@ p.error {
   .fi-head { grid-template-columns: 1fr; }
   .fi-head .share-trigger-btn { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 0.6rem; }
 }
+
+/* ============================================================
+   HISTORY LAYOUT TEST (BL-038): switcher, one list, side by side
+   ============================================================ */
+#layout-switch {
+  max-width: 868px;
+  margin: 0 auto 0.9rem;
+  padding: 0 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+#layout-switch .ls-label {
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--departure); margin-right: 0.25rem;
+}
+#layout-switch a {
+  font-size: 0.8rem; padding: 0.3rem 0.7rem; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text-muted); text-decoration: none;
+}
+#layout-switch a.is-on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#layout-switch .ls-hint { flex-basis: 100%; font-size: 0.75rem; color: var(--text-muted); }
+
+#history-alt { max-width: 868px; margin: 0 auto 2rem; padding: 0 1rem; }
+
+/* One list */
+.hl-list { list-style: none; margin: 0; padding: 0; }
+.hl-row {
+  display: grid;
+  grid-template-columns: 5.6rem 1fr;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-left: 3px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.hl-row--isb { border-left-color: var(--accent); background: rgba(59,130,246,0.05); }
+.hl-row--dep { border-left-color: rgba(255,255,255,0.22); }
+.hl-time { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-muted); padding-top: 0.1rem; }
+.hl-body p { margin: 0; overflow-wrap: anywhere; }
+.hl-airport { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-right: 0.4rem; }
+.hl-row--isb .hl-airport { color: var(--accent-2); }
+.hl-row--dep .hl-airport { color: var(--text-muted); }
+.hl-change { font-size: 0.8rem; color: var(--text-muted); }
+.hl-detail { font-size: 0.9rem; color: var(--text); }
+.hl-row--dep .hl-detail { font-size: 0.85rem; color: #cbd5e1; }
+
+/* Side by side */
+.hc-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; table-layout: fixed; }
+.hc-table th, .hc-table td { border: 1px solid var(--border); padding: 0.5rem 0.55rem; vertical-align: top; overflow-wrap: anywhere; }
+.hc-table th { background: var(--surface-2); text-align: left; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.hc-table th small { display: block; font-size: 0.65rem; text-transform: none; letter-spacing: 0; color: var(--text-muted); font-weight: 400; }
+.hc-table th:first-child { width: 4.8rem; }
+.hc-table th.hc-isb { color: var(--accent-2); }
+.hc-table th.hc-dep { color: var(--text-muted); }
+.hc-table td.hc-isb:not(:empty) { background: rgba(59,130,246,0.06); }
+.hc-time { font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; color: var(--text-muted); }
+.hc-change { display: block; font-size: 0.7rem; color: var(--text-muted); }
+
+@media (max-width: 400px) {
+  .hl-row { grid-template-columns: 1fr; gap: 0.1rem; }
+  .hc-table { font-size: 0.76rem; }
+  .hc-table th, .hc-table td { padding: 0.4rem 0.35rem; }
+  .hc-table th:first-child { width: 3.6rem; }
+}

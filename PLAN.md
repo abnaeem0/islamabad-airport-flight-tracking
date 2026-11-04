@@ -25,6 +25,7 @@ Public repo: no email, phone, credentials or security details in this file.
 - **Live 2026-11-04:** BL-010B view applied and checked (133 matched). The two BL-032 views were run ("no rows returned", which is normal for a CREATE); their existence is not yet confirmed by a query. PR #10 is still not merged, so the site still reads the old tables.
 - **BL-032 switch (merged 2026-11-04, owner away, by the owner's instruction):** search, history and details read `isb_flights_view` / `isb_snapshots_view` and **fall back to the old tables** if a view errors, so the site works even if the view SQL was not applied. Rollback: revert the merge commit (the old tables and collector were never touched). Turn off the old Islamabad collector only after several days of side-by-side checks. Checked in a stubbed browser with views present and missing; not checked on the live site.
 - **Merged 2026-11-04 (late), by the owner's instruction:** BL-036 details-page journey card (PR #11) (needs no SQL; reads `origin_snapshots` for the "first seen departed" line and hides it if that read fails).
+- **History layout test live 2026-11-04 (BL-038):** add `&layout=list` to any domestic arrival's details link; the switcher offers Separate / One list / Side by side. Departure-board history exists only for the last 7 days and only for paired flights.
 - **Suggested next sequence:** BL-017 (private evidence) -> switch on the contact form (BL-028 key) -> BL-002 -> BL-010A (validate origin data) -> BL-021 / BL-022 -> BL-010B/C. A newly observed outage goes first.
 
 ## 2. Spec
@@ -75,7 +76,7 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-038**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-039**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -99,6 +100,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-034 | feature | P2 | M | Inbox | Add more origin airports? About 76% of Islamabad arrivals come from airports we do not watch (international and other Pakistani cities); decide which to add once the city list is known |
 | BL-035 | research | P2 | S | Inbox | Explain 9 unmatched arrivals from watched airports that do have departure rows (missing rows for today's flights; PA204 numbering; PK368 8 h gap) |
 | BL-036 | feature | P1 | S | Testing | Details page as one journey card: flight number, then Islamabad's line (large), then the departure airport's line (smaller), with early/late wording, "first seen departed" time and a note when the two boards disagree. Merged 2026-11-04 (PR #11); checked in a stubbed browser (6 scenarios x 4 widths), live check pending |
+| BL-038 | research | P2 | S | Testing | Owner test: is the details-page history clearer with both airports in one place? Adding `&layout=list` (one time-ordered list, each row labelled with its airport) or `&layout=columns` (departure board and Islamabad side by side) to a details link shows a test switcher; without it the page is unchanged. Owner picks one; then make it the default and remove the switcher and the unused layouts |
 | BL-037 | research | P2 | S | Inbox | Departure boards rarely show when a flight actually left: owner saw Islamabad say "Advanced" (30 min early) while Karachi showed only the scheduled time. Check one raw PAA departure response for fields the collector drops (it keeps only ST, ET, remarks), and how ET/remarks change after take-off |
 | BL-032 | feature | P1 | M | Testing | Switch search, history and details to the origin tables via two Islamabad-only views, with fallback to the old tables; always fetch yesterday for Islamabad (D-015). Merged 2026-11-04 (PR #10); live checks pending |
 | BL-011 | feature | P3 | L | Inbox | Flight-change notifications |
@@ -322,6 +324,11 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 **Done 2026-11-04.** Kept for reference. After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-04 (night) | Claude | BL-038 history layout test
+- Done: owner asked whether the history would be easier with both boards in one place. Built two combined layouts behind `&layout=` so the owner can compare on real flights; the departure board's history now comes from one `origin_snapshots` read that also gives the "first seen departed" time. 45 stubbed-browser checks pass (4 flights x 3 layouts x 320/375/1280 px, plus the earlier set); the public page is unchanged without the parameter.
+- Not done: branch deletion is not allowed from this session; the owner deletes the 11 merged or abandoned branches on GitHub (all checked: nothing unmerged is lost).
+- Next: owner compares the three layouts on a few domestic arrivals and picks one.
 
 ### 2026-11-04 (late) | Claude | BL-036 journey card
 - Done: owner said the text sizes on the details page made it hard to tell what matters, and asked to fold the departure-airport box into the main flight view. Rebuilt the header as one card with a clear size ladder; Islamabad's current status and time now sit in the card (before, they were only in the history table). Added a note when Islamabad has moved the time but the departure board has not, and a "first seen departed" line from our own snapshots. 6 scenarios x 4 widths pass in a stubbed browser (no sideways scroll, hostile text escaped, view missing hides the line).
