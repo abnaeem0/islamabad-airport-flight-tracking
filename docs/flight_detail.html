@@ -18,7 +18,7 @@
   </script>
 </head>
 
-<body>
+<body class="detail-page">
   <header class="site-header">
     <div class="nav-container">
       <a href="index.html" class="logo">Islamabad Flight Tracker</a>
@@ -32,13 +32,17 @@
 
   <p class="back-link"><a href="index.html">&larr; Back to search</a></p>
 
-  <h1>Flight Details</h1>
+  <h1>Flight details</h1>
 
-  <div id="flight-info">
-    <p>Loading...</p>
-  </div>
+  <section class="journey-card">
+    <div id="flight-info">
+      <p>Loading...</p>
+    </div>
+    <div id="origin-box" hidden></div>
+    <p class="journey-foot">Airport board information, not the aircraft's position.</p>
+  </section>
 
-  <div id="origin-box" hidden></div>
+  <h2 class="section-title">Islamabad board history</h2>
 
   <div id="snapshot-controls">
     <span id="last-refreshed"></span>
