@@ -30,49 +30,83 @@ document.addEventListener('DOMContentLoaded', async () => {
   const client      = supabase.createClient(supabaseUrl, supabaseKey);
 
   // ===== AIRLINE LOOKUP =====
-  // Keyed by the IATA prefix of the flight number
+  // Keyed by the two-character IATA code at the start of the flight number.
+  // fsCode: the code FlightStats uses in its tracker links. Usually the IATA code;
+  //   where FlightStats needs something else (ICAO code or a trailing *), it is set here.
+  //   Checked against live flightstats.com tracker URLs on 2026-11-04.
+  // statusUrl / contact: the airline's own flight-status page and Pakistan helpline.
+  //   Only filled where checked against the airline's own site; left out otherwise
+  //   rather than guessed.
   const AIRLINE_INFO = {
-    PK: {
-      name:      'Pakistan Intl (PIA)',
-      contact:   '111-786-786',
-      statusUrl: 'https://book-pia.crane.aero/ibe/flightStatus?&tab=route',
-      fsCode:    'PK',
-      fsSuffix:  '',
-    },
-    PA: {
-      name:      'AirBlue',
-      contact:   '111-247-258',
-      statusUrl: 'https://www.airblue.com/bookings/flight_status.aspx',
-      fsCode:    'ABQ',
-      fsSuffix:  '',
-    },
-    '9P': {
-      name:      'Fly Jinnah',
-      contact:   '021-111-000-035',
-      statusUrl: 'https://www.flyjinnah.com/en/manage/flight-status/check-flight-status',
-      fsCode:    'FJL',
-      fsSuffix:  '',
-    },
-    PF: {
-      name:      'AirSial',
-      contact:   '021-111-247-742',
-      statusUrl: 'https://www.airsial.com/manage-reservation',
-      fsCode:    'PF',
-      fsSuffix:  '*',
-    },
+    // Pakistani airlines
+    PK:   { name: 'PIA',               fsCode: 'PK',
+            statusUrl: 'https://book-pia.crane.aero/ibe/flightStatus?&tab=route',
+            contact: '111-786-786 (from abroad +92-21-111-786-786)' },
+    PA:   { name: 'Airblue',           fsCode: 'ABQ',
+            statusUrl: 'https://airblue.com/flightinfo/status',
+            contact: '111-247-258 (from abroad +92-51-111-247-258)' },
+    '9P': { name: 'Fly Jinnah',        fsCode: 'FJL',
+            statusUrl: 'https://www.flyjinnah.com/en/manage/flight-status/check-flight-status',
+            contact: '021-111-000-035' },
+    PF:   { name: 'AirSial',           fsCode: 'PF*',
+            statusUrl: 'https://www.airsial.com/flight-status',
+            contact: '021-38732063' },
+    ER:   { name: 'SereneAir',         fsCode: 'SEP' },
+    // Foreign airlines that serve Islamabad
+    EK:   { name: 'Emirates',          fsCode: 'EK', statusUrl: 'https://www.emirates.com/flightstatus' },
+    EY:   { name: 'Etihad',            fsCode: 'EY', statusUrl: 'https://www.etihad.com/en/manage/flight-status' },
+    QR:   { name: 'Qatar Airways',     fsCode: 'QR' },
+    FZ:   { name: 'flydubai',          fsCode: 'FZ' },
+    G9:   { name: 'Air Arabia',        fsCode: 'G9' },
+    '3L': { name: 'Air Arabia Abu Dhabi', fsCode: '3L*' },
+    SV:   { name: 'Saudia',            fsCode: 'SV' },
+    XY:   { name: 'flynas',            fsCode: 'XY' },
+    F3:   { name: 'flyadeal',          fsCode: 'FAD' },
+    GF:   { name: 'Gulf Air',          fsCode: 'GF' },
+    WY:   { name: 'Oman Air',          fsCode: 'WY' },
+    OV:   { name: 'SalamAir',          fsCode: 'OMS' },
+    KU:   { name: 'Kuwait Airways',    fsCode: 'KU' },
+    J9:   { name: 'Jazeera Airways',   fsCode: 'J9' },
+    TK:   { name: 'Turkish Airlines',  fsCode: 'TK' },
+    BA:   { name: 'British Airways',   fsCode: 'BA' },
+    CA:   { name: 'Air China',         fsCode: 'CA' },
+    CZ:   { name: 'China Southern',    fsCode: 'CZ' },
+    TG:   { name: 'Thai Airways',      fsCode: 'TG' },
+    ET:   { name: 'Ethiopian',         fsCode: 'ET' },
+    MS:   { name: 'EgyptAir',          fsCode: 'MS' },
+    HY:   { name: 'Uzbekistan Airways', fsCode: 'HY' },
+    J2:   { name: 'Azerbaijan Airlines', fsCode: 'J2' },
+    KA:   { name: 'Aero Nomad',        fsCode: 'ANK' },
+    SZ:   { name: 'Somon Air',         fsCode: 'SMR' },
+    FG:   { name: 'Ariana Afghan',     fsCode: 'FG' },
+    RQ:   { name: 'Kam Air',           fsCode: 'RQ' },
+    IA:   { name: 'Iraqi Airways',     fsCode: 'IA' },
+    B9:   { name: 'Iran Airtour',      fsCode: 'B9' },
+    W5:   { name: 'Mahan Air',         fsCode: 'W5' },
   };
 
+  // Flight numbers from the airport feed start with the 2-character IATA code
+  // (letters or a digit and a letter, e.g. PK301, 9P734, 3L123), then the number.
+  function splitFlightNumber(flightNum) {
+    const clean = String(flightNum || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const m = clean.match(/^([A-Z0-9]{2})(\d{1,4})[A-Z]?$/);
+    return m ? { code: m[1], digits: m[2] } : { code: clean.slice(0, 2), digits: '' };
+  }
+
   function getAirlineInfo(flightNum) {
-    // Try 2-char prefix first, then 1-char
-    const letters = flightNum.replace(/[^A-Za-z0-9]/g, '');
-    const prefix2 = letters.slice(0, 2).toUpperCase();
-    const prefix1 = letters.slice(0, 1).toUpperCase();
-    return AIRLINE_INFO[prefix2] || AIRLINE_INFO[prefix1] || {
-      name:      'Airline',
-      contact:   'N/A',
-      website:   '#',
-      statusUrl: '#',
-    };
+    const { code } = splitFlightNumber(flightNum);
+    return AIRLINE_INFO[code] || { name: 'Airline' };
+  }
+
+  // FlightStats tracker link, or '' when the flight number is not a normal airline
+  // number (the feed also lists aircraft registrations such as APESL)
+  function flightStatsUrl(flightNum, isoDate) {
+    const { code, digits } = splitFlightNumber(flightNum);
+    if (!digits || !/^[A-Z0-9]{2}$/.test(code) || /^\d{2}$/.test(code)) return '';
+    const fsCode = (AIRLINE_INFO[code] && AIRLINE_INFO[code].fsCode) || code;
+    const [yr, mo, dy] = String(isoDate || '').split('-');
+    const q = (yr && mo && dy) ? `?year=${yr}&month=${parseInt(mo, 10)}&date=${parseInt(dy, 10)}` : '';
+    return `https://www.flightstats.com/v2/flight-tracker/${encodeURIComponent(fsCode)}/${parseInt(digits, 10)}${q}`;
   }
 
   // ===== UTILS =====
@@ -311,17 +345,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const status  = latest.status || '—';
     const lastUpd = lastScrapeTime ? formatPKT(lastScrapeTime) : formatPKT(latest.scraped_at);
 
-    // FlightStats link: strip the IATA prefix to get pure flight digits
-    // e.g. 9P734 -> prefix is '9P' (2 chars) -> digits '734'
-    //      PF125 -> prefix is 'PF' (2 chars) -> digits '125'
-    const iataKey  = AIRLINE_INFO[flightNumber.slice(0,2).toUpperCase()] ? 2 : 1;
-    const digits   = flightNumber.slice(iataKey).replace(/[^0-9]/g, '');
-    const fsCode   = airline.fsCode   || flightNumber.replace(/[^A-Za-z]/g, '');
-    const fsSuffix = airline.fsSuffix || '';
-    const [yr, mo, dy] = date.split('-');
-    const fsUrl = `https://www.flightstats.com/v2/flight-tracker/${fsCode}${fsSuffix}/${digits}?year=${yr}&month=${parseInt(mo)}&date=${parseInt(dy)}`;
+    const fsUrl = flightStatsUrl(flightNumber, date);
 
-    const pageUrl = window.location.href;
+    // Share a clean link to this page (drop the BL-038 layout test switch)
+    const shareParams = new URLSearchParams(window.location.search);
+    shareParams.delete('layout');
+    const pageUrl = `${window.location.origin}${window.location.pathname}?${shareParams.toString()}`;
 
     const lines = [
       `✈️ Flight Update`,
@@ -331,15 +360,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       `📊 Status: ${status}`,
       `🕒 Last scraped: ${lastUpd} PKT`,
       `────────────────`,
-      `🔎 Live verification:`,
-      `FlightStats: ${fsUrl}`,
     ];
+    if (fsUrl) {
+      lines.push(`🔎 Live verification:`);
+      lines.push(`FlightStats: ${fsUrl}`);
+    }
 
-    if (airline.statusUrl && airline.statusUrl !== '#') {
+    if (airline.statusUrl) {
       lines.push(`🏢 Airline status:`);
       lines.push(`${airline.name}: ${airline.statusUrl}`);
     }
-    if (airline.contact && airline.contact !== 'N/A') {
+    if (airline.contact) {
       lines.push(`📞 Helpline: ${airline.contact}`);
     }
 

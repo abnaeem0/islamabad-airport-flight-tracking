@@ -302,7 +302,7 @@ p.error {
 
 .flight-card {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
   gap: 1rem;
   background: var(--surface);
@@ -332,6 +332,21 @@ p.error {
   border-radius: 6px;
   background: var(--surface-2);
   padding: 4px;
+}
+
+/* Shown in place of a logo that failed to load, so the card keeps its shape */
+.flight-card .logo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .flight-card strong {
@@ -849,7 +864,7 @@ p.error {
   }
 
   .flight-card {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 40px minmax(0, 1fr);
   }
 
   .flight-card button {
