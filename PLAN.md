@@ -25,7 +25,7 @@ Public repo: no email, phone, credentials or security details in this file.
 - **Live 2026-11-04:** BL-010B view applied and checked (133 matched). The two BL-032 views were run ("no rows returned", which is normal for a CREATE); their existence is not yet confirmed by a query. PR #10 is still not merged, so the site still reads the old tables.
 - **BL-032 switch (merged 2026-11-04, owner away, by the owner's instruction):** search, history and details read `isb_flights_view` / `isb_snapshots_view` and **fall back to the old tables** if a view errors, so the site works even if the view SQL was not applied. Rollback: revert the merge commit (the old tables and collector were never touched). Turn off the old Islamabad collector only after several days of side-by-side checks. Checked in a stubbed browser with views present and missing; not checked on the live site.
 - **Merged 2026-11-04 (late), by the owner's instruction:** BL-036 details-page journey card (PR #11) (needs no SQL; reads `origin_snapshots` for the "first seen departed" line and hides it if that read fails).
-- **History switch live 2026-11-05 (BL-038):** no link change needed; domestic arrivals with departure-board history show "Both airports" / "Islamabad only" above the history. International flights and departures show the plain Islamabad table. Departure-board history exists only for the last 7 days and only for paired flights.
+- **BL-038 (2026-11-05):** history switchers removed; the details page is back to the BL-036 card plus the Islamabad history table. Next layout is chosen from chat mockups, not built behind switches.
 - **Suggested next sequence:** BL-017 (private evidence) -> switch on the contact form (BL-028 key) -> BL-002 -> BL-010A (validate origin data) -> BL-021 / BL-022 -> BL-010B/C. A newly observed outage goes first.
 
 ## 2. Spec
@@ -100,7 +100,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-034 | feature | P2 | M | Inbox | Add more origin airports? About 76% of Islamabad arrivals come from airports we do not watch (international and other Pakistani cities); decide which to add once the city list is known |
 | BL-035 | research | P2 | S | Inbox | Explain 9 unmatched arrivals from watched airports that do have departure rows (missing rows for today's flights; PA204 numbering; PK368 8 h gap) |
 | BL-036 | feature | P1 | S | Testing | Details page as one journey card: flight number, then Islamabad's line (large), then the departure airport's line (smaller), with early/late wording, "first seen departed" time and a note when the two boards disagree. Merged 2026-11-04 (PR #11); checked in a stubbed browser (6 scenarios x 4 widths), live check pending |
-| BL-038 | feature | P2 | S | Testing | Details-page history: owner dropped "Side by side" (2026-11-05). Domestic arrivals with departure-board history now show two buttons, **Both airports** (default: one list, newest first, each row named by airport) and **Islamabad only** (the old table); the choice is remembered in the browser. Old `&layout=` links still open. Owner tries it on live flights and keeps or adjusts |
+| BL-038 | research | P2 | S | Doing | Details-page history layout. The on-page switchers (PR #12, #14) were removed on the owner's instruction (2026-11-05): no test switches in the live code. Owner chooses from mockups shown in chat; then only that layout is built |
 | BL-037 | research | P2 | S | Inbox | Departure boards rarely show when a flight actually left: owner saw Islamabad say "Advanced" (30 min early) while Karachi showed only the scheduled time. Check one raw PAA departure response for fields the collector drops (it keeps only ST, ET, remarks), and how ET/remarks change after take-off |
 | BL-032 | feature | P1 | M | Testing | Switch search, history and details to the origin tables via two Islamabad-only views, with fallback to the old tables; always fetch yesterday for Islamabad (D-015). Merged 2026-11-04 (PR #10); live checks pending |
 | BL-011 | feature | P3 | L | Inbox | Flight-change notifications |
@@ -327,7 +327,8 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 
 ### 2026-11-05 | Claude | BL-038 simplified
 - Done: owner found the `&layout=` test link awkward and asked for the choice on the page, without "Side by side". Two buttons now sit above the history (Both airports by default, Islamabad only), switch without reloading and are remembered per browser; the combined list is newest first with larger text. Stubbed-browser checks pass (3 flights x 320/375/1280 px: buttons, switching, remembered choice, no sideways scroll, hostile text; no switcher for international, departure or missing-view cases; old links).
-- Next: owner tries it on a few domestic arrivals.
+- Then: owner said no switchers in the code; wants mockups in chat and only the chosen design built. Restored the three details-page files to the BL-036 state (stubbed-browser checks pass).
+- Next: owner picks a mockup.
 
 ### 2026-11-04 (night) | Claude | BL-038 history layout test
 - Done: owner asked whether the history would be easier with both boards in one place. Built two combined layouts behind `&layout=` so the owner can compare on real flights; the departure board's history now comes from one `origin_snapshots` read that also gives the "first seen departed" time. 45 stubbed-browser checks pass (4 flights x 3 layouts x 320/375/1280 px, plus the earlier set); the public page is unchanged without the parameter.
