@@ -5,15 +5,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const flightNumber = urlParams.get('flight');
   const date         = urlParams.get('date');
   const typeParam    = urlParams.get('type');   // 'Arrival' | 'Departure' | null (old links)
-  // History view (BL-038): 'both' = both airports in one list, 'isb' = Islamabad only.
-  // The choice is remembered in this browser; old ?layout= test links still work.
-  const VIEWS = { both: 'Both airports', isb: 'Islamabad only' };
-  const layoutParam = urlParams.get('layout');
-  let layout = layoutParam === 'separate' ? 'isb' : (layoutParam ? 'both' : null);
-  if (!layout) {
-    try { layout = localStorage.getItem('historyView'); } catch (e) { layout = null; }
-  }
-  if (!VIEWS[layout]) layout = 'both';
   const flightInfoDiv = document.getElementById('flight-info');
 
   if (!flightNumber || !date) {
@@ -391,93 +382,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ===== HISTORY LAYOUTS (BL-038 test) =====
-  const historyTitle = document.querySelector('.section-title');
-  const tableEl      = document.getElementById('snapshot-table');
-  let   altHistory   = null;
-
-  function shortPKT(dateStr) {
-    const n = dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : dateStr + 'Z';
-    return new Date(n).toLocaleString('en-GB', {
-      timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
-    });
-  }
-
-  function changeText(t) {
-    return { new: 'First seen', status_change: 'Status changed', time_change: 'Time changed',
-             city_change: 'City changed', dropped: 'Dropped from board' }[t] || 'Update';
-  }
-
-  // "Advanced · expected 15:25 · sched 15:55"
-  function boardLine(s) {
-    const hasEt = s.et != null && String(s.et).trim() !== '' && String(s.et).trim() !== String(s.st || '').trim();
-    return [s.status ? display(s.status) : null,
-            hasEt ? `expected ${display(s.et)}` : null,
-            `sched ${display(s.st)}`].filter(Boolean).join(' · ');
-  }
-
-  // Two buttons above the history; only shown when there is departure-airport history to add
-  let lastHistory = null;
-  function renderSwitcher(hasDep) {
-    let sw = document.getElementById('layout-switch');
-    if (!hasDep) { if (sw) sw.remove(); return; }
-    if (!sw) {
-      sw = document.createElement('div');
-      sw.id = 'layout-switch';
-      sw.setAttribute('role', 'group');
-      sw.setAttribute('aria-label', 'Show history for');
-      historyTitle.parentNode.insertBefore(sw, historyTitle);
-      sw.addEventListener('click', e => {
-        const b = e.target.closest('button[data-view]');
-        if (!b || b.dataset.view === layout) return;
-        layout = b.dataset.view;
-        try { localStorage.setItem('historyView', layout); } catch (err) { /* not saved, still switches */ }
-        if (lastHistory) renderHistory(...lastHistory);
-      });
-    }
-    sw.innerHTML = `<span class="ls-label">Show history for</span>` + Object.entries(VIEWS).map(([k, v]) =>
-      `<button type="button" data-view="${k}" class="${k === layout ? 'is-on' : ''}" aria-pressed="${k === layout}">${v}</button>`).join('');
-  }
-
-  function renderHistory(isbSnaps, dep, isArrival) {
-    lastHistory = [isbSnaps, dep, isArrival];
-    const depSnaps = dep && dep.snaps.length ? dep.snaps : null;
-    renderSwitcher(!!depSnaps);
-
-    if (layout === 'isb' || !depSnaps) {
-      if (altHistory) { altHistory.remove(); altHistory = null; }
-      tableEl.style.display = '';
-      historyTitle.textContent = `Islamabad board history`;
-      renderSnapshots(isbSnaps);
-      return;
-    }
-
-    tableEl.style.display = 'none';
-    if (!altHistory) {
-      altHistory = document.createElement('div');
-      altHistory.id = 'history-alt';
-      tableEl.parentNode.insertBefore(altHistory, tableEl.nextSibling);
-    }
-    const depName = display(dep.airport);
-    historyTitle.innerHTML = `${depName} and Islamabad boards`;
-
-    const rows = [
-      ...depSnaps.map(s => ({ ...s, side: 'dep' })),
-      ...isbSnaps.map(s => ({ ...s, side: 'isb' })),
-    ].sort((a, b) => new Date(a.scraped_at.endsWith('Z') || a.scraped_at.includes('+') ? a.scraped_at : a.scraped_at + 'Z')
-                   - new Date(b.scraped_at.endsWith('Z') || b.scraped_at.includes('+') ? b.scraped_at : b.scraped_at + 'Z'));
-
-    // Newest first, so the latest news is at the top
-    altHistory.innerHTML = `<ol class="hl-list">${rows.reverse().map(r => `
-      <li class="hl-row hl-row--${r.side}">
-        <p class="hl-top">
-          <span class="hl-airport">${r.side === 'isb' ? 'Islamabad' : depName}</span>
-          <span class="hl-time">${esc(shortPKT(r.scraped_at))}</span>
-        </p>
-        <p class="hl-detail">${boardLine(r)}</p>
-      </li>`).join('')}</ol>`;
-  }
-
   // ===== DEPARTURE AIRPORT BOX (domestic arrivals only) =====
   // Reads the view isb_arrival_origin_view (BL-010B). If the view is missing, empty or
   // unmatched, the box stays hidden and the rest of the page is unaffected.
@@ -525,26 +429,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     originBox.hidden = false;
   }
 
-  // The departure board's change history for the paired leg (oldest first); [] if unreadable
-  async function fetchDepHistory(row) {
+  // When the departure board first showed "Departed" (our own observation time, not the take-off time)
+  async function fetchDepartedAt(row) {
     try {
       const { data, error } = await client
         .from('origin_snapshots')
-        .select('scraped_at,status,st,et,change_type')
+        .select('scraped_at,status')
         .eq('flight_number', row.flight_number)
         .eq('scheduled_date', row.departure_date)
         .eq('type', 'Departure')
         .eq('source_airport', row.departure_airport)
-        .order('scraped_at', { ascending: true });
-      return (error || !data) ? [] : data;
+        .ilike('status', '%depart%')
+        .order('scraped_at', { ascending: true })
+        .limit(1);
+      if (error || !data || !data.length) return null;
+      return data[0].scraped_at;
     } catch (e) {
-      return [];
+      return null;
     }
   }
 
-  // Returns { airport, snaps } for a paired domestic arrival, otherwise null
   async function fetchOriginBox(flightType, isbLeg) {
-    if (flightType !== 'Arrival') { hideOriginBox(); return null; }
+    if (flightType !== 'Arrival') { hideOriginBox(); return; }
     try {
       const { data, error } = await client
         .from('isb_arrival_origin_view')
@@ -552,16 +458,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         .eq('flight_number', flightNumber)
         .eq('arrival_date', date)
         .limit(1);
-      if (error || !data || !data.length) { hideOriginBox(); return null; }
+      if (error || !data || !data.length) { hideOriginBox(); return; }
       const row = data[0];
-      if (row.match_state !== 'matched') { hideOriginBox(); return null; }
-      const depSnaps   = await fetchDepHistory(row);
-      const firstGone  = depSnaps.find(d => /depart/i.test(d.status || ''));
-      renderOriginBox(row, isbLeg, firstGone ? firstGone.scraped_at : null);
-      return { airport: row.departure_airport, snaps: depSnaps };
+      const departedAt = row.match_state === 'matched' ? await fetchDepartedAt(row) : null;
+      renderOriginBox(row, isbLeg, departedAt);
     } catch (e) {
       hideOriginBox();
-      return null;
     }
   }
 
@@ -644,8 +546,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (existingBtn) existingBtn.remove();
       injectShareButton(snapshots);
 
-      const dep = await fetchOriginBox(first.type, latest);
-      renderHistory(snapshots, dep, isArrival);
+      renderSnapshots(snapshots);
+      await fetchOriginBox(first.type, latest);
 
     } catch (err) {
       console.error(err);
