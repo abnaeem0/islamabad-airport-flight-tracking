@@ -5,10 +5,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const flightNumber = urlParams.get('flight');
   const date         = urlParams.get('date');
   const typeParam    = urlParams.get('type');   // 'Arrival' | 'Departure' | null (old links)
-  // History layout test (BL-038): only links carrying ?layout= show the switcher; everyone else sees 'separate'
-  const layoutParam  = urlParams.get('layout');
-  const LAYOUTS      = { separate: 'Separate', list: 'One list', columns: 'Side by side' };
-  const layout       = LAYOUTS[layoutParam] ? layoutParam : 'separate';
+  // History view (BL-038): 'both' = both airports in one list, 'isb' = Islamabad only.
+  // The choice is remembered in this browser; old ?layout= test links still work.
+  const VIEWS = { both: 'Both airports', isb: 'Islamabad only' };
+  const layoutParam = urlParams.get('layout');
+  let layout = layoutParam === 'separate' ? 'isb' : (layoutParam ? 'both' : null);
+  if (!layout) {
+    try { layout = localStorage.getItem('historyView'); } catch (e) { layout = null; }
+  }
+  if (!VIEWS[layout]) layout = 'both';
   const flightInfoDiv = document.getElementById('flight-info');
 
   if (!flightNumber || !date) {
@@ -411,26 +416,35 @@ document.addEventListener('DOMContentLoaded', async () => {
             `sched ${display(s.st)}`].filter(Boolean).join(' · ');
   }
 
+  // Two buttons above the history; only shown when there is departure-airport history to add
+  let lastHistory = null;
   function renderSwitcher(hasDep) {
     let sw = document.getElementById('layout-switch');
-    if (!layoutParam) { if (sw) sw.remove(); return; }
+    if (!hasDep) { if (sw) sw.remove(); return; }
     if (!sw) {
-      sw = document.createElement('nav');
+      sw = document.createElement('div');
       sw.id = 'layout-switch';
-      sw.setAttribute('aria-label', 'History layout (test)');
+      sw.setAttribute('role', 'group');
+      sw.setAttribute('aria-label', 'Show history for');
       historyTitle.parentNode.insertBefore(sw, historyTitle);
+      sw.addEventListener('click', e => {
+        const b = e.target.closest('button[data-view]');
+        if (!b || b.dataset.view === layout) return;
+        layout = b.dataset.view;
+        try { localStorage.setItem('historyView', layout); } catch (err) { /* not saved, still switches */ }
+        if (lastHistory) renderHistory(...lastHistory);
+      });
     }
-    const link = key => { const u = new URLSearchParams(window.location.search); u.set('layout', key); return '?' + u.toString(); };
-    sw.innerHTML = `<span class="ls-label">Test view</span>` + Object.entries(LAYOUTS).map(([k, v]) =>
-      `<a href="${esc(link(k))}" class="${k === layout ? 'is-on' : ''}"${k === layout ? ' aria-current="true"' : ''}>${v}</a>`).join('')
-      + (hasDep ? '' : `<span class="ls-hint">No departure-airport history for this flight, so all three look alike.</span>`);
+    sw.innerHTML = `<span class="ls-label">Show history for</span>` + Object.entries(VIEWS).map(([k, v]) =>
+      `<button type="button" data-view="${k}" class="${k === layout ? 'is-on' : ''}" aria-pressed="${k === layout}">${v}</button>`).join('');
   }
 
   function renderHistory(isbSnaps, dep, isArrival) {
+    lastHistory = [isbSnaps, dep, isArrival];
     const depSnaps = dep && dep.snaps.length ? dep.snaps : null;
     renderSwitcher(!!depSnaps);
 
-    if (layout === 'separate' || !depSnaps) {
+    if (layout === 'isb' || !depSnaps) {
       if (altHistory) { altHistory.remove(); altHistory = null; }
       tableEl.style.display = '';
       historyTitle.textContent = `Islamabad board history`;
@@ -445,7 +459,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       tableEl.parentNode.insertBefore(altHistory, tableEl.nextSibling);
     }
     const depName = display(dep.airport);
-    historyTitle.innerHTML = `Flight history · ${depName} and Islamabad`;
+    historyTitle.innerHTML = `${depName} and Islamabad boards`;
 
     const rows = [
       ...depSnaps.map(s => ({ ...s, side: 'dep' })),
@@ -453,28 +467,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     ].sort((a, b) => new Date(a.scraped_at.endsWith('Z') || a.scraped_at.includes('+') ? a.scraped_at : a.scraped_at + 'Z')
                    - new Date(b.scraped_at.endsWith('Z') || b.scraped_at.includes('+') ? b.scraped_at : b.scraped_at + 'Z'));
 
-    if (layout === 'list') {
-      altHistory.innerHTML = `<ol class="hl-list">${rows.map(r => `
-        <li class="hl-row hl-row--${r.side}">
+    // Newest first, so the latest news is at the top
+    altHistory.innerHTML = `<ol class="hl-list">${rows.reverse().map(r => `
+      <li class="hl-row hl-row--${r.side}">
+        <p class="hl-top">
+          <span class="hl-airport">${r.side === 'isb' ? 'Islamabad' : depName}</span>
           <span class="hl-time">${esc(shortPKT(r.scraped_at))}</span>
-          <div class="hl-body">
-            <p><span class="hl-airport">${r.side === 'isb' ? 'Islamabad' : depName}</span>
-               <span class="hl-change">${changeText(r.change_type)}</span></p>
-            <p class="hl-detail">${boardLine(r)}</p>
-          </div>
-        </li>`).join('')}</ol>`;
-    } else {
-      altHistory.innerHTML = `
-        <table class="hc-table">
-          <thead><tr><th>Seen at</th><th class="hc-dep">${depName}<small>departure board</small></th><th class="hc-isb">Islamabad<small>${isArrival ? 'arrival' : 'departure'} board</small></th></tr></thead>
-          <tbody>${rows.map(r => `
-            <tr>
-              <td class="hc-time">${esc(shortPKT(r.scraped_at))}</td>
-              <td class="hc-dep">${r.side === 'dep' ? `<span class="hc-change">${changeText(r.change_type)}</span>${boardLine(r)}` : ''}</td>
-              <td class="hc-isb">${r.side === 'isb' ? `<span class="hc-change">${changeText(r.change_type)}</span>${boardLine(r)}` : ''}</td>
-            </tr>`).join('')}</tbody>
-        </table>`;
-    }
+        </p>
+        <p class="hl-detail">${boardLine(r)}</p>
+      </li>`).join('')}</ol>`;
   }
 
   // ===== DEPARTURE AIRPORT BOX (domestic arrivals only) =====
