@@ -155,26 +155,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     return 'neutral';
   }
 
-  function statusPill(status, small) {
-    return `<span class="status-pill status-pill--${statusTone(status)}${small ? ' status-pill--sm' : ''}">${display(status || 'No status')}</span>`;
+  function statusPill(status) {
+    return `<span class="status-pill status-pill--${statusTone(status)}">${display(status || 'No status')}</span>`;
   }
 
-  // One airport's line: big time (expected if it differs, else scheduled), status, and the sub-line
-  function legHtml({ label, st, et, status, small, extraDate }) {
+  // Islamabad's line: big time (expected if it differs, else scheduled), status, and the sub-line
+  function legHtml({ label, st, et, status }) {
     const d       = minutesDiff(st, et);
     const hasEt   = et != null && String(et).trim() !== '' && String(et).trim() !== String(st || '').trim();
     const bigTime = hasEt ? et : st;
     const kind    = hasEt ? 'Expected' : 'Scheduled';
     const dtxt    = diffText(d);
     const sub = hasEt
-      ? `Expected · scheduled ${display(st)}${extraDate ? ' (' + display(extraDate) + ')' : ''}${dtxt ? ` · <strong class="delta delta--${d < 0 ? 'early' : 'late'}">${esc(dtxt)}</strong>` : ''}`
-      : `${kind}${extraDate ? ' · ' + display(extraDate) : ''} · no expected time posted`;
+      ? `Expected · scheduled ${display(st)}${dtxt ? ` · <strong class="delta delta--${d < 0 ? 'early' : 'late'}">${esc(dtxt)}</strong>` : ''}`
+      : `${kind} · no expected time posted`;
     return `
-      <div class="leg ${small ? 'leg--secondary' : 'leg--primary'}">
+      <div class="leg leg--primary">
         <p class="leg-label">${label}</p>
         <div class="leg-main">
           <span class="leg-time">${display(bigTime)}</span>
-          ${statusPill(status, small)}
+          ${statusPill(status)}
         </div>
         <p class="leg-sub">${sub}</p>
       </div>`;
@@ -361,6 +361,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ===== RENDER SNAPSHOTS =====
+  // Table date: "6 Nov, 08:46" (Pakistan time), short enough to leave room for the status
+  function shortPKT(dateStr) {
+    const n = dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : dateStr + 'Z';
+    const d = new Date(n);
+    const day  = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short' });
+    const time = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${day}, ${time}`;
+  }
+
   function renderSnapshots(snapshots) {
     tbody.innerHTML = '';
 
@@ -372,7 +381,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     snapshots.forEach(s => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${formatPKT(s.scraped_at)}</td>
+        <td>${esc(shortPKT(s.scraped_at))}</td>
         <td>${display(s.st)}</td>
         <td>${display(s.et)}</td>
         <td>${display(s.status)}</td>
@@ -382,75 +391,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ===== DEPARTURE AIRPORT BOX (domestic arrivals only) =====
-  // Reads the view isb_arrival_origin_view (BL-010B). If the view is missing, empty or
-  // unmatched, the box stays hidden and the rest of the page is unaffected.
-  const originBox = document.getElementById('origin-box');
-  const STALE_MINUTES = 60;
+  // ===== DEPARTURE AIRPORT (domestic arrivals only, BL-038) =====
+  // Islamabad's board is the main view. The departure airport's board (from isb_arrival_origin_view
+  // and origin_snapshots) is used for two things only:
+  //   1. a one-line notice when it shows something Islamabad's board has not caught up with;
+  //   2. its own history, shown when the visitor picks it in the "Airport board" switch.
+  // If the view is missing, unmatched or errors, neither appears and the page works as before.
+  const noticeEl      = document.getElementById('board-notice');
+  const historyTitle  = document.getElementById('history-title');
+  const switchEl      = document.getElementById('board-switch');
+  const boardMetaEl   = document.getElementById('board-meta');
+  const isbCheckedEl  = document.getElementById('snapshot-controls');
+  const STALE_MINUTES  = 60;  // departure-board data older than this is not used for the notice
+  const NOTICE_MINUTES = 15;  // departure board this much later than Islamabad's board -> notice
 
-  function hideOriginBox() {
-    if (originBox) { originBox.hidden = true; originBox.innerHTML = ''; }
-  }
+  let board    = 'isb';  // which history is showing: 'isb' or 'dep'
+  let isbSnaps = [];
+  let dep      = null;   // { row, snaps } for a matched domestic arrival, else null
+  let isArrivalFlight = true;
 
   function minutesSince(dateStr) {
     return (Date.now() - new Date(dateStr).getTime()) / 60000;
   }
 
-  // isbLeg: latest Islamabad snapshot, used to spot when the two boards disagree
-  function renderOriginBox(row, isbLeg, departedAt) {
-    if (!originBox) return;
-    if (!row || row.match_state !== 'matched') { hideOriginBox(); return; }
-
-    const stale = !row.departure_checked || minutesSince(row.departure_checked) > STALE_MINUTES;
-    const checked = row.departure_checked
-      ? `${esc(timeAgo(row.departure_checked))} (${esc(formatPKT(row.departure_checked))} PKT)`
-      : 'unknown';
-    const overnight = row.departure_date && row.departure_date !== row.arrival_date;
-    const source = row.departure_source === 'paa' ? 'Pakistan Airports Authority' : row.departure_source;
-
-    // Islamabad has moved the arrival time, but the departure airport shows nothing beyond the schedule
-    const isbShift   = isbLeg ? minutesDiff(isbLeg.st, isbLeg.et) : null;
-    const depHasEt   = row.departure_et != null && String(row.departure_et).trim() !== ''
-                       && String(row.departure_et).trim() !== String(row.departure_st || '').trim();
-    const depLeft    = /depart|airborne|take/i.test(row.departure_status || '');
-    const disagree   = isbShift !== null && Math.abs(isbShift) >= 5 && !depHasEt && !depLeft;
-
-    originBox.innerHTML = `
-      ${legHtml({
-        label: `${display(row.departure_airport)} · departure board`,
-        st: row.departure_st, et: row.departure_et, status: row.departure_status,
-        small: true, extraDate: overnight ? row.departure_date : null,
-      })}
-      ${departedAt ? `<p class="leg-note">This board first showed it departed at ${esc(formatPKT(departedAt))} PKT. We check about every 15 minutes, so it left at or before then.</p>` : ''}
-      ${disagree ? `<p class="leg-note leg-note--warn">Islamabad's board has changed the arrival time (${esc(diffText(isbShift))}), but ${display(row.departure_airport)}'s board has not posted a departure update. The two airports update their boards separately, so they can disagree for a while.</p>` : ''}
-      <p class="leg-meta">Source: ${display(source)} · checked ${checked}</p>
-      ${stale ? `<p class="leg-note leg-note--warn">${display(row.departure_airport)} information may be out of date.</p>` : ''}
-    `;
-    originBox.hidden = false;
+  function clockPKT(dateStr) {
+    const n = dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : dateStr + 'Z';
+    return new Date(n).toLocaleTimeString('en-GB', { timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit', hour12: false });
   }
 
-  // When the departure board first showed "Departed" (our own observation time, not the take-off time)
-  async function fetchDepartedAt(row) {
-    try {
-      const { data, error } = await client
-        .from('origin_snapshots')
-        .select('scraped_at,status')
-        .eq('flight_number', row.flight_number)
-        .eq('scheduled_date', row.departure_date)
-        .eq('type', 'Departure')
-        .eq('source_airport', row.departure_airport)
-        .ilike('status', '%depart%')
-        .order('scraped_at', { ascending: true })
-        .limit(1);
-      if (error || !data || !data.length) return null;
-      return data[0].scraped_at;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  async function fetchOriginBox(flightType, isbLeg) {
-    if (flightType !== 'Arrival') { hideOriginBox(); return; }
+  async function fetchDeparture(flightType) {
+    if (flightType !== 'Arrival') return null;
     try {
       const { data, error } = await client
         .from('isb_arrival_origin_view')
@@ -458,12 +428,104 @@ document.addEventListener('DOMContentLoaded', async () => {
         .eq('flight_number', flightNumber)
         .eq('arrival_date', date)
         .limit(1);
-      if (error || !data || !data.length) { hideOriginBox(); return; }
+      if (error || !data || !data.length || data[0].match_state !== 'matched') return null;
       const row = data[0];
-      const departedAt = row.match_state === 'matched' ? await fetchDepartedAt(row) : null;
-      renderOriginBox(row, isbLeg, departedAt);
+      const res = await client
+        .from('origin_snapshots')
+        .select('scraped_at,status,st,et,change_type')
+        .eq('flight_number', row.flight_number)
+        .eq('scheduled_date', row.departure_date)
+        .eq('type', 'Departure')
+        .eq('source_airport', row.departure_airport)
+        .order('scraped_at', { ascending: true });
+      return { row, snaps: (res.error || !res.data) ? [] : res.data };
     } catch (e) {
-      hideOriginBox();
+      return null;
+    }
+  }
+
+  // The one-line notice, or null. Only when the departure board is fresh and shows something
+  // Islamabad's board does not: cancelled, departed, or NOTICE_MINUTES+ later than Islamabad.
+  function departureNotice(isb) {
+    if (!dep) return null;
+    const row = dep.row;
+    if (!row.departure_checked || minutesSince(row.departure_checked) > STALE_MINUTES) return null;
+    const name      = display(row.departure_airport);
+    const depStatus = String(row.departure_status || '');
+    const isbStatus = String(isb.status || '');
+    const isbMoved  = /land|arriv|airborne|depart|en ?route|cancel/i.test(isbStatus);
+
+    if (/cancel/i.test(depStatus) && !/cancel/i.test(isbStatus)) {
+      return `${name}'s board shows this flight cancelled. Islamabad's board hasn't updated yet.`;
+    }
+    if (isbMoved) return null;
+    if (/depart|airborne/i.test(depStatus)) {
+      const seen = dep.snaps.find(s => /depart|airborne/i.test(s.status || ''));
+      return `Departed ${name}${seen ? ` (seen ${esc(clockPKT(seen.scraped_at))})` : ''}. Islamabad's board hasn't updated yet.`;
+    }
+    const depLate = minutesDiff(row.departure_st, row.departure_et);
+    if (depLate !== null && depLate > 0) {
+      const isbLate = minutesDiff(isb.st, isb.et) || 0;
+      if (depLate - isbLate >= NOTICE_MINUTES) {
+        return `${name} shows ${esc(diffText(depLate))}. Islamabad shows ${isbLate ? esc(diffText(isbLate)) : 'on time'}.`;
+      }
+    }
+    return null;
+  }
+
+  function renderNotice(isb) {
+    const msg = departureNotice(isb);
+    if (!msg) { noticeEl.hidden = true; noticeEl.innerHTML = ''; return; }
+    noticeEl.innerHTML = `<p>${msg} <button type="button" class="notice-link">See ${display(dep.row.departure_airport)} board</button></p>`;
+    noticeEl.hidden = false;
+  }
+
+  noticeEl.addEventListener('click', e => {
+    if (!e.target.closest('.notice-link')) return;
+    board = 'dep';
+    renderBoard();
+    historyTitle.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  switchEl.addEventListener('click', e => {
+    const b = e.target.closest('button[data-board]');
+    if (!b || b.dataset.board === board) return;
+    board = b.dataset.board;
+    renderBoard();
+  });
+
+  // History section: Islamabad's board, or the departure airport's when picked
+  function renderBoard() {
+    const hasDep = !!(dep && dep.snaps.length);
+    if (!hasDep) board = 'isb';
+    const isbName = `Islamabad ${isArrivalFlight ? 'arrivals' : 'departures'}`;
+
+    if (!hasDep) {
+      historyTitle.textContent = `${isbName} board history`;
+      switchEl.hidden = true; switchEl.innerHTML = '';
+      boardMetaEl.hidden = true; boardMetaEl.innerHTML = '';
+      renderSnapshots(isbSnaps);
+      return;
+    }
+
+    const depName = display(dep.row.departure_airport);
+    historyTitle.textContent = 'Airport board';
+    switchEl.innerHTML = [['isb', esc(isbName)], ['dep', `${depName} departures`]].map(([k, label]) =>
+      `<button type="button" data-board="${k}" class="${k === board ? 'is-on' : ''}" aria-pressed="${k === board}">${label}</button>`).join('');
+    switchEl.hidden = false;
+
+    if (board === 'dep') {
+      const row     = dep.row;
+      const stale   = !row.departure_checked || minutesSince(row.departure_checked) > STALE_MINUTES;
+      const checked = row.departure_checked ? esc(timeAgo(row.departure_checked)) : 'unknown';
+      boardMetaEl.innerHTML = `${depName} board · checked ${checked}${stale ? ` · <span class="board-stale">may be out of date</span>` : ''}`;
+      boardMetaEl.hidden = false;
+      isbCheckedEl.hidden = true;   // Islamabad's "Last checked" would read as Lahore's
+      renderSnapshots(dep.snaps);
+    } else {
+      boardMetaEl.hidden = true; boardMetaEl.innerHTML = '';
+      isbCheckedEl.hidden = false;
+      renderSnapshots(isbSnaps);
     }
   }
 
@@ -536,7 +598,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
         ${legHtml({
           label: `Islamabad · ${isArrival ? 'arrival' : 'departure'}`,
-          st: latest.st, et: latest.et, status: latest.status, small: false,
+          st: latest.st, et: latest.et, status: latest.status,
         })}
       `;
 
@@ -546,8 +608,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (existingBtn) existingBtn.remove();
       injectShareButton(snapshots);
 
-      renderSnapshots(snapshots);
-      await fetchOriginBox(first.type, latest);
+      isbSnaps        = snapshots;
+      isArrivalFlight = isArrival;
+      dep             = await fetchDeparture(first.type);
+      renderNotice(latest);
+      renderBoard();
 
     } catch (err) {
       console.error(err);

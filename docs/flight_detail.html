@@ -38,11 +38,12 @@
     <div id="flight-info">
       <p>Loading...</p>
     </div>
-    <div id="origin-box" hidden></div>
-    <p class="journey-foot">Airport board information, not the aircraft's position.</p>
+    <div id="board-notice" hidden></div>
   </section>
 
-  <h2 class="section-title">Islamabad board history</h2>
+  <h2 class="section-title" id="history-title">Islamabad board history</h2>
+  <div id="board-switch" role="group" aria-label="Airport board" hidden></div>
+  <p id="board-meta" hidden></p>
 
   <div id="snapshot-controls">
     <span id="last-refreshed"></span>
@@ -51,9 +52,9 @@
   <table id="snapshot-table">
     <thead>
       <tr>
-        <th>Scraped At</th>
-        <th>ST</th>
-        <th>ET</th>
+        <th>Seen at</th>
+        <th>Scheduled</th>
+        <th>Expected</th>
         <th>Status</th>
         <th>Change</th>
       </tr>

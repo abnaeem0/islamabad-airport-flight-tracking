@@ -1208,7 +1208,7 @@ p.error {
   margin-right: auto;
 }
 /* Long unbroken values must wrap instead of pushing the page wider than the screen */
-#snapshot-table td:nth-child(4) { overflow-wrap: anywhere; }  /* status column only */
+#snapshot-table td:nth-child(4) { overflow-wrap: break-word; }  /* status: break only words too long for the column */
 #snapshot-table td:nth-child(2),
 #snapshot-table td:nth-child(3) { white-space: nowrap; }  /* keep ST / ET times on one line */
 
@@ -1217,6 +1217,23 @@ p.error {
   #snapshot-table th,
   #snapshot-table td { padding: 0.5rem 0.3rem; }
   #snapshot-table th { font-size: 0.62rem; letter-spacing: 0.04em; }
+}
+@media (max-width: 600px) {
+  /* Fixed column widths on phones: whole words like "Scheduled" stay intact, and a freak
+     long word breaks inside its own column instead of pushing the page sideways */
+  #snapshot-table { table-layout: fixed; }
+  #snapshot-table th:nth-child(1) { width: 20%; }
+  #snapshot-table th:nth-child(2),
+  #snapshot-table th:nth-child(3) { width: 18%; }
+  #snapshot-table th:nth-child(4) { width: 24%; }
+  #snapshot-table th:nth-child(5) { width: 20%; }
+}
+@media (max-width: 400px) {
+  /* "Scheduled" / "Expected" headers: sentence case fits a 320px screen, capitals do not */
+  #snapshot-table th { text-transform: none; letter-spacing: 0; font-size: 0.66rem; }
+  #snapshot-table { font-size: 0.74rem; }
+  #snapshot-table td:nth-child(2),
+  #snapshot-table td:nth-child(3) { white-space: normal; }
 }
 
 /* Links in the share preview were default blue on a dark box */
@@ -1444,38 +1461,61 @@ p.error {
 .leg--primary .leg-time  { font-size: clamp(2.1rem, 9vw, 2.6rem); color: #fff; }
 .leg--primary .leg-sub   { margin-top: 0.3rem; }
 
-/* Departure airport: supporting line, clearly smaller */
-#origin-box {
-  margin: 0.9rem 0 0;
-  padding: 0.2rem 0 0.1rem 1rem;
-  border-left: 2px dashed rgba(255,255,255,0.14);
-  margin-left: 0.6rem;
-}
-#origin-box[hidden] { display: none; }
-#origin-box > * + * { margin-top: 0.35rem; }
-.leg--secondary .leg-label { color: var(--text-muted); margin-bottom: 0.15rem; }
-.leg--secondary .leg-time  { font-size: 1.3rem; color: var(--text); }
-.leg--secondary .leg-sub   { font-size: 0.8rem; margin-top: 0.15rem; }
-
-.leg-note {
-  font-size: 0.8rem;
+/* One-line notice when the departure airport's board shows something Islamabad's has not (BL-038) */
+#board-notice {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: rgba(245,158,11,0.12);
+  border: 1px solid rgba(245,158,11,0.35);
+  color: #fbbf24;
+  font-size: 0.9rem;
   line-height: 1.45;
-  color: var(--text);
   overflow-wrap: anywhere;
 }
-.leg-note--warn { color: var(--departure); }
-.leg-meta {
-  font-size: 0.72rem;
+#board-notice[hidden] { display: none; }
+#board-notice p { margin: 0; }
+.notice-link {
+  background: none; border: 0; padding: 0; margin-left: 0.2rem;
+  font: inherit; color: #fde68a; text-decoration: underline; cursor: pointer;
+}
+.notice-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* "Airport board" switch above the history (BL-038) */
+#board-switch {
+  max-width: 868px;
+  margin: 0.2rem auto 0.6rem;
+  padding: 0 1rem;
+  display: flex;
+  gap: 0.25rem;
+}
+#board-switch[hidden] { display: none; }
+#board-switch button {
+  flex: 1 1 0;
+  min-width: 0;
+  font-family: 'Sora', sans-serif;
+  font-size: 0.88rem;
+  padding: 0.55rem 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+#board-switch button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+#board-switch button:last-child  { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+#board-switch button.is-on { background: var(--surface-2); color: #fff; font-weight: 600; border-color: var(--accent); }
+#board-switch button:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+#board-meta {
+  max-width: 868px;
+  margin: 0 auto 0.4rem;
+  padding: 0 1rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   overflow-wrap: anywhere;
 }
-.journey-foot {
-  margin-top: 0.9rem !important;
-  padding-top: 0.7rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
+#board-meta[hidden] { display: none; }
+.board-stale { color: var(--departure); }
 
 /* Status pills: colour is a hint only, the board's own words are always shown */
 .status-pill {
@@ -1488,7 +1528,6 @@ p.error {
   border: 1px solid transparent;
   overflow-wrap: anywhere;
 }
-.status-pill--sm      { font-size: 0.72rem; padding: 0.1rem 0.5rem; }
 .status-pill--good    { background: rgba(16,185,129,0.15); color: #34d399; border-color: rgba(16,185,129,0.35); }
 .status-pill--warn    { background: rgba(245,158,11,0.15); color: #fbbf24; border-color: rgba(245,158,11,0.35); }
 .status-pill--bad     { background: rgba(248,113,113,0.15); color: #f87171; border-color: rgba(248,113,113,0.35); }
@@ -1516,4 +1555,14 @@ p.error {
 @media (max-width: 380px) {
   .fi-head { grid-template-columns: 1fr; }
   .fi-head .share-trigger-btn { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 0.6rem; }
+}
+#snapshot-controls[hidden] { display: none; }
+@media (max-width: 359px) {
+  /* Very narrow phones: drop the "Change" column so the time headers have room */
+  #snapshot-table th:nth-child(5),
+  #snapshot-table td:nth-child(5) { display: none; }
+  #snapshot-table th:nth-child(1) { width: 26%; }
+  #snapshot-table th:nth-child(2),
+  #snapshot-table th:nth-child(3) { width: 23%; }
+  #snapshot-table th:nth-child(4) { width: 28%; }
 }
