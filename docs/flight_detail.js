@@ -303,7 +303,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isArrival = (latest.type || '').toLowerCase() === 'arrival';
     const route     = isArrival ? `${city} → Islamabad` : `Islamabad → ${city}`;
 
-    const dep     = latest.st ? `${latest.st} (${date})` : '—';
+    const when    = latest.st ? `${latest.st} (${date})` : '—';
     const status  = latest.status || '—';
     const lastUpd = lastScrapeTime ? formatPKT(lastScrapeTime) : formatPKT(latest.scraped_at);
 
@@ -314,7 +314,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const digits   = flightNumber.slice(iataKey).replace(/[^0-9]/g, '');
     const fsCode   = airline.fsCode   || flightNumber.replace(/[^A-Za-z]/g, '');
     const fsSuffix = airline.fsSuffix || '';
-    const [yr, mo, dy] = date.split('-');
+    // FlightStats files a flight under the day it departs its origin. For a departure that is
+    // Islamabad's date; for a matched domestic arrival it is the departure airport's date, which
+    // differs from the arrival date on overnight legs. Unmatched arrivals keep the arrival date.
+    const fsDate = (isArrival && dep && /^\d{4}-\d{2}-\d{2}$/.test(dep.row.departure_date || ''))
+      ? dep.row.departure_date
+      : date;
+    const [yr, mo, dy] = fsDate.split('-');
     const fsUrl = `https://www.flightstats.com/v2/flight-tracker/${fsCode}${fsSuffix}/${digits}?year=${yr}&month=${parseInt(mo)}&date=${parseInt(dy)}`;
 
     const pageUrl = window.location.href;
@@ -323,7 +329,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `✈️ Flight Update`,
       `Flight: ${flightNumber}`,
       `Route: ${route}`,
-      `⏰ ${isArrival ? 'Arrival' : 'Departure'}: ${dep}`,
+      `⏰ ${isArrival ? 'Arrival' : 'Departure'}: ${when}`,
       `📊 Status: ${status}`,
       `🕒 Last scraped: ${lastUpd} PKT`,
       `────────────────`,

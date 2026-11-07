@@ -123,6 +123,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-028 | feature | P1 | M | Testing | Contact form with callback option; footer repaired and email removed (done). Not live until the owner's form key is pasted and a test message arrives |
 | BL-029 | bug | P2 | S | Done | Search page default date used the UTC date, not Pakistan's |
 | BL-030 | bug | P2 | S | Done | Flight details page layout: unstyled header, table overflow, unreadable share links |
+| BL-039 | bug | P2 | S | Proposed | Share text: FlightStats link used Islamabad's arrival date, so overnight arrivals linked to the wrong day's flight. Now uses the departure airport's date for matched domestic arrivals |
 
 ### Task records
 
@@ -177,6 +178,8 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 **BL-026** No workflow concurrency guard or dependency manifest. Measure both collectors first; do not add GitHub schedules on top of the external one. Accept: overlap policy and dependencies defined, run duration observed, safe scheduling handoff documented.
 
 **BL-027** Both collectors use `verify=False`. Diagnose the certificate chain before choosing a verified alternative. Accept: verified TLS works, or a narrow justified exception.
+
+**BL-039** *New 2026-11-08 (owner report).* FlightStats files a flight under the date it leaves its origin; the share link used the page date, which for arrivals is Islamabad's arrival date. A flight leaving Karachi at 23:30 and landing at 01:30 linked to the next day's flight. Fix in `buildShareText`: matched domestic arrivals use `departure_date` from `isb_arrival_origin_view`; departures keep Islamabad's date. Also renamed a local `dep` variable that hid the departure data. Limit: unmatched arrivals (international, unwatched airports, view missing) still use the arrival date, because we have no departure date for them. Accept: stubbed checks for overnight, same-day, unmatched, view-missing and departure cases (pass 2026-11-08); live check: share an overnight domestic arrival and confirm the FlightStats page shows that flight.
 
 **BL-028** *New 2026-11-01.* User need: visitors can reach the owner without the owner publishing an email address or phone number (D-014).
 - Approach: a plain HTML form posts to a hosted form service, which emails the owner. The service stores the destination address in its dashboard or behind a form key, so the page source contains neither. Candidates: Web3Forms (no account) or Formspree; check current free limits `[UNVERIFIED]`.
@@ -324,6 +327,10 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 **Done 2026-11-04.** Kept for reference. After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-08 | Claude | BL-039 FlightStats date
+- Done: share link now uses the departure airport's date for matched domestic arrivals. 5 stubbed cases pass. Unmatched arrivals unchanged (no departure date known).
+- Next: owner applies or merges, then shares one overnight domestic arrival to check.
 
 ### 2026-11-06 | Claude | BL-038 Islamabad-first page
 - Done: owner set the rule: show Islamabad only, unless the departure board has an update Islamabad's doesn't reflect; departure-board history behind a labelled "Airport board" switch; Islamabad's top line fixed. Agreed from chat mockups first (no test switches in code). Built the notice (cancelled / departed / 15+ min later; owner said "16", taken as the 15 discussed), the switch, shorter table dates and plain headers, About-page note. 11 stubbed scenarios x 4 widths pass, including a deliberately long status word; the older test that looked for the removed departure box is retired.
