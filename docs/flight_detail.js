@@ -71,6 +71,73 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
+  // ===== DEPARTURE DATE AT THE ORIGIN (FlightStats link, BL-039) =====
+  // FlightStats files a flight under the day it leaves its origin. Islamabad's board gives only
+  // the arrival date and time, so for arrivals with no departure-board match we estimate:
+  // Islamabad scheduled arrival minus the typical flight time, read as a date in the origin's
+  // time zone. If that lands near midnight at the origin, the date is too uncertain and the link
+  // carries no date (FlightStats then shows the flight nearest to now, with tabs for other days).
+  //
+  // Origin city (as Islamabad's board writes it; case, spaces and punctuation ignored):
+  //   [time zone, typical scheduled flight minutes to Islamabad]
+  const ORIGIN_TIMES = {
+    // Pakistan (used only when the departure board gives no match)
+    karachi: ['Asia/Karachi', 120], lahore: ['Asia/Karachi', 55], peshawar: ['Asia/Karachi', 40],
+    faisalabad: ['Asia/Karachi', 45], multan: ['Asia/Karachi', 60], quetta: ['Asia/Karachi', 95],
+    gilgit: ['Asia/Karachi', 60], skardu: ['Asia/Karachi', 60], sukkur: ['Asia/Karachi', 85],
+    gwadar: ['Asia/Karachi', 135], turbat: ['Asia/Karachi', 130], bahawalpur: ['Asia/Karachi', 70],
+    rahimyarkhan: ['Asia/Karachi', 80], dgkhan: ['Asia/Karachi', 70], deraghazikhan: ['Asia/Karachi', 70],
+    sialkot: ['Asia/Karachi', 40], chitral: ['Asia/Karachi', 60],
+    // Gulf
+    dubai: ['Asia/Dubai', 180], sharjah: ['Asia/Dubai', 175], abudhabi: ['Asia/Dubai', 180],
+    rasalkhaimah: ['Asia/Dubai', 170], alain: ['Asia/Dubai', 175], fujairah: ['Asia/Dubai', 165],
+    muscat: ['Asia/Muscat', 165], doha: ['Asia/Qatar', 200], bahrain: ['Asia/Bahrain', 210],
+    kuwait: ['Asia/Kuwait', 230],
+    // Saudi Arabia
+    dammam: ['Asia/Riyadh', 245], riyadh: ['Asia/Riyadh', 255], jeddah: ['Asia/Riyadh', 295],
+    madinah: ['Asia/Riyadh', 280], almadinah: ['Asia/Riyadh', 280], medina: ['Asia/Riyadh', 280],
+    madina: ['Asia/Riyadh', 280], qassim: ['Asia/Riyadh', 260], alqassim: ['Asia/Riyadh', 260],
+    gassim: ['Asia/Riyadh', 260], taif: ['Asia/Riyadh', 290], abha: ['Asia/Riyadh', 300],
+    tabuk: ['Asia/Riyadh', 300], yanbu: ['Asia/Riyadh', 290], alula: ['Asia/Riyadh', 285],
+    // Elsewhere
+    istanbul: ['Europe/Istanbul', 330], london: ['Europe/London', 465], manchester: ['Europe/London', 455],
+    birmingham: ['Europe/London', 460], paris: ['Europe/Paris', 420], toronto: ['America/Toronto', 780],
+    baku: ['Asia/Baku', 185], tashkent: ['Asia/Tashkent', 105], kabul: ['Asia/Kabul', 65],
+    najaf: ['Asia/Baghdad', 225], baghdad: ['Asia/Baghdad', 225], mashhad: ['Asia/Tehran', 140],
+    tehran: ['Asia/Tehran', 180], urumqi: ['Asia/Shanghai', 160], kashgar: ['Asia/Shanghai', 90],
+    beijing: ['Asia/Shanghai', 395], bangkok: ['Asia/Bangkok', 300], kualalumpur: ['Asia/Kuala_Lumpur', 360],
+  };
+  // CORRECTIONS: when a FlightStats link opens the wrong day, add the flight here with its real
+  // scheduled flight time in minutes (FlightStats shows both times with their time zones).
+  // Example: PK246 leaves Dammam 23:30 (+03), lands Islamabad 05:35 (+05) -> 4 h 05 = 245.
+  const FLIGHT_MINUTES = {
+    PK246: 245,
+  };
+  const NEAR_MIDNIGHT = 45;  // minutes: closer than this to midnight at the origin -> no date
+  const NEAR_MIDNIGHT_CORRECTED = 10;
+
+  function ymdIn(timeZone, ms) {
+    const p = {};
+    new Intl.DateTimeFormat('en-GB', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; });
+    return `${p.year}-${p.month}-${p.day}`;
+  }
+
+  // 'YYYY-MM-DD' the flight departs its origin, or null when unknown or too close to call
+  function estimatedDepartureDate(flightNum, city, arrDate, st) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(arrDate || '');
+    const arrMin = toMinutes(st);
+    const place = ORIGIN_TIMES[String(city || '').toLowerCase().replace(/[^a-z]/g, '')];
+    if (!m || arrMin === null || !place) return null;
+    const fixed  = FLIGHT_MINUTES[String(flightNum || '').toUpperCase()];
+    const flight = fixed || place[1];
+    const margin = fixed ? NEAR_MIDNIGHT_CORRECTED : NEAR_MIDNIGHT;
+    const arrUtc = Date.UTC(+m[1], +m[2] - 1, +m[3]) + (arrMin - 5 * 60) * 60000;  // PKT is UTC+5
+    const depAt  = extra => ymdIn(place[0], arrUtc - (flight + extra) * 60000);
+    const day = depAt(0);
+    return depAt(-margin) === day && depAt(margin) === day ? day : null;
+  }
+
   // ===== UTILS =====
 
   // scraped_at is stored as a UTC clock value without a timezone marker, so a value
@@ -314,14 +381,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const digits   = flightNumber.slice(iataKey).replace(/[^0-9]/g, '');
     const fsCode   = airline.fsCode   || flightNumber.replace(/[^A-Za-z]/g, '');
     const fsSuffix = airline.fsSuffix || '';
-    // FlightStats files a flight under the day it departs its origin. For a departure that is
-    // Islamabad's date; for a matched domestic arrival it is the departure airport's date, which
-    // differs from the arrival date on overnight legs. Unmatched arrivals keep the arrival date.
-    const fsDate = (isArrival && dep && /^\d{4}-\d{2}-\d{2}$/.test(dep.row.departure_date || ''))
-      ? dep.row.departure_date
-      : date;
-    const [yr, mo, dy] = fsDate.split('-');
-    const fsUrl = `https://www.flightstats.com/v2/flight-tracker/${fsCode}${fsSuffix}/${digits}?year=${yr}&month=${parseInt(mo)}&date=${parseInt(dy)}`;
+    // FlightStats files a flight under the day it departs its origin. Departures: Islamabad's date.
+    // Matched domestic arrivals: the departure board's date. Other arrivals: estimated (see
+    // estimatedDepartureDate); when that is unsure the link has no date.
+    let fsDate = date;
+    if (isArrival) {
+      const timed = [...snapshots].reverse().find(s => toMinutes(s.st) !== null) || latest;
+      fsDate = (dep && /^\d{4}-\d{2}-\d{2}$/.test(dep.row.departure_date || ''))
+        ? dep.row.departure_date
+        : estimatedDepartureDate(flightNumber, latest.city || timed.city, date, timed.st);
+    }
+    let fsUrl = `https://www.flightstats.com/v2/flight-tracker/${fsCode}${fsSuffix}/${digits}`;
+    if (fsDate) {
+      const [yr, mo, dy] = fsDate.split('-');
+      fsUrl += `?year=${yr}&month=${parseInt(mo)}&date=${parseInt(dy)}`;
+    }
 
     const pageUrl = window.location.href;
 
