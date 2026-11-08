@@ -75,8 +75,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // FlightStats files a flight under the day it leaves its origin. Islamabad's board gives only
   // the arrival date and time, so for arrivals with no departure-board match we estimate:
   // Islamabad scheduled arrival minus the typical flight time, read as a date in the origin's
-  // time zone. If that lands near midnight at the origin, the date is too uncertain and the link
-  // carries no date (FlightStats then shows the flight nearest to now, with tabs for other days).
+  // time zone. A wrong link costs trust, so if there is any doubt (the estimate lands within
+  // NEAR_MIDNIGHT minutes of midnight at the origin, the city is unknown or the time is missing)
+  // the share box asks the sender which day it took off, with our guess preselected.
   //
   // Origin city (as Islamabad's board writes it; case, spaces and punctuation ignored):
   //   [time zone, typical scheduled flight minutes to Islamabad]
@@ -101,7 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     tabuk: ['Asia/Riyadh', 300], yanbu: ['Asia/Riyadh', 290], alula: ['Asia/Riyadh', 285],
     // Elsewhere
     istanbul: ['Europe/Istanbul', 330], london: ['Europe/London', 465], manchester: ['Europe/London', 455],
-    birmingham: ['Europe/London', 460], paris: ['Europe/Paris', 420], toronto: ['America/Toronto', 780],
+    birmingham: ['Europe/London', 460], paris: ['Europe/Paris', 420], toronto: ['America/Toronto', 855],
     baku: ['Asia/Baku', 185], tashkent: ['Asia/Tashkent', 105], kabul: ['Asia/Kabul', 65],
     najaf: ['Asia/Baghdad', 225], baghdad: ['Asia/Baghdad', 225], mashhad: ['Asia/Tehran', 140],
     tehran: ['Asia/Tehran', 180], urumqi: ['Asia/Shanghai', 160], kashgar: ['Asia/Shanghai', 90],
@@ -113,7 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const FLIGHT_MINUTES = {
     PK246: 245,
   };
-  const NEAR_MIDNIGHT = 45;  // minutes: closer than this to midnight at the origin -> no date
+  const NEAR_MIDNIGHT = 120;  // minutes: closer than this to midnight at the origin -> ask
   const NEAR_MIDNIGHT_CORRECTED = 10;
 
   function ymdIn(timeZone, ms) {
@@ -123,8 +124,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `${p.year}-${p.month}-${p.day}`;
   }
 
-  // 'YYYY-MM-DD' the flight departs its origin, or null when unknown or too close to call
-  function estimatedDepartureDate(flightNum, city, arrDate, st) {
+  // Estimated departure day at the origin: { date: 'YYYY-MM-DD', sure: bool }, or null when the
+  // city or the time is unknown. sure = the same date even if the flight time is off by the margin.
+  function estimateDeparture(flightNum, city, arrDate, st) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(arrDate || '');
     const arrMin = toMinutes(st);
     const place = ORIGIN_TIMES[String(city || '').toLowerCase().replace(/[^a-z]/g, '')];
@@ -135,7 +137,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const arrUtc = Date.UTC(+m[1], +m[2] - 1, +m[3]) + (arrMin - 5 * 60) * 60000;  // PKT is UTC+5
     const depAt  = extra => ymdIn(place[0], arrUtc - (flight + extra) * 60000);
     const day = depAt(0);
-    return depAt(-margin) === day && depAt(margin) === day ? day : null;
+    return { date: day, sure: depAt(-margin) === day && depAt(margin) === day };
+  }
+
+  function dayBefore(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] - 1)).toISOString().slice(0, 10) : null;
+  }
+
+  // "Sun 8 Nov"
+  function dayLabel(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    if (!m) return '';
+    return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]))
+      .toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+      .replace(',', '');
   }
 
   // ===== UTILS =====
@@ -276,31 +292,34 @@ document.addEventListener('DOMContentLoaded', async () => {
           <button id="share-modal-close" aria-label="Close">&times;</button>
         </div>
 
-        <div id="share-text-preview" role="region" aria-label="Share message preview"></div>
+        <!-- Departure day for the FlightStats link (arrivals only, BL-039) -->
+        <div id="share-day" hidden></div>
+
+        <label id="share-text-label" for="share-text">Message (you can edit it)</label>
+        <textarea id="share-text" rows="11" spellcheck="false"></textarea>
 
         <div id="share-actions">
-          <button id="share-copy-btn" class="share-btn share-btn--primary">
-            <span id="share-copy-icon">📋</span> Copy
-          </button>
+          <div id="share-btn-row">
+            <button id="share-copy-btn" class="share-btn share-btn--primary">
+              <span id="share-copy-icon">📋</span> Copy
+            </button>
+            <button id="share-native-btn" class="share-btn share-btn--primary" hidden>
+              <span>📤</span> Share
+            </button>
+          </div>
 
           <!-- WhatsApp -->
           <div id="share-wa-row">
-            <label for="share-wa-input">WhatsApp number</label>
+            <label for="share-wa-input">Send on WhatsApp (to yourself or anyone)</label>
             <div id="share-wa-input-row">
               <span id="share-wa-prefix">+92</span>
               <input id="share-wa-input" type="tel" maxlength="10" placeholder="3001234567" inputmode="numeric">
               <button id="share-wa-btn" class="share-btn share-btn--whatsapp" aria-label="Send on WhatsApp">
                 <svg id="share-wa-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.558 4.122 1.532 5.862L.057 23.428a.75.75 0 0 0 .916.916l5.566-1.475A11.944 11.944 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.694 9.694 0 0 1-4.953-1.357l-.355-.211-3.683.975.993-3.585-.232-.369A9.695 9.695 0 0 1 2.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/></svg>
-                Open WhatsApp
+                Send
               </button>
             </div>
           </div>
-
-          <!-- SMS stub (hidden, enable later) -->
-          <!-- <button id="share-sms-btn" class="share-btn share-btn--secondary">📱 SMS</button> -->
-
-          <!-- Email stub (hidden, enable later) -->
-          <!-- <button id="share-email-btn" class="share-btn share-btn--secondary">✉️ Email</button> -->
         </div>
       </div>
     `;
@@ -311,15 +330,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('share-modal-backdrop').addEventListener('click', closeShareModal);
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShareModal(); });
 
+    const messageText = () => document.getElementById('share-text').value;
+
     // Copy button
     document.getElementById('share-copy-btn').addEventListener('click', () => {
-      const text = document.getElementById('share-text-preview').innerText;
-      navigator.clipboard.writeText(text).then(() => {
+      navigator.clipboard.writeText(messageText()).then(() => {
         const btn = document.getElementById('share-copy-btn');
         btn.textContent = '✅ Copied!';
         setTimeout(() => { btn.innerHTML = '<span>📋</span> Copy'; }, 2000);
       });
     });
+
+    // Share button: the phone's own share sheet, shown only where the browser has one
+    const nativeBtn = document.getElementById('share-native-btn');
+    if (navigator.share) {
+      nativeBtn.hidden = false;
+      nativeBtn.addEventListener('click', () => {
+        navigator.share({ text: messageText() }).catch(() => {});  // closing the sheet is not an error
+      });
+    }
 
     // WhatsApp button
     document.getElementById('share-wa-btn').addEventListener('click', () => {
@@ -329,29 +358,110 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       const number = '92' + raw.replace(/^0+/, '');
-      const text   = encodeURIComponent(document.getElementById('share-text-preview').innerText);
-      window.open(`https://wa.me/${number}?text=${text}`, '_blank');
+      window.open(`https://wa.me/${number}?text=${encodeURIComponent(messageText())}`, '_blank');
+    });
+
+    // Picking a day swaps the FlightStats link inside the message, keeping the sender's edits
+    document.getElementById('share-day').addEventListener('change', e => {
+      if (e.target.name !== 'share-day') return;
+      setShareDay(e.target.value);
+    });
+    document.getElementById('share-day').addEventListener('click', e => {
+      if (e.target.closest('.day-change')) renderDayQuestion();
     });
   }
 
-  function renderPreview(text) {
-    const el = document.getElementById('share-text-preview');
-    // Linkify URLs, keep everything else as escaped text
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const html = text
-      .split('\n')
-      .map(line => {
-        const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        return escaped.replace(urlRegex, url =>
-          `<a href="${url}" target="_blank" rel="noopener">${url}</a>`
-        );
-      })
-      .join('\n');
-    el.innerHTML = html;
+  // ----- Departure day (arrivals) -----
+  let shareCtx = null;   // { flight, fsUrlFor, fsUrl, arrDate, origin, guess, sure, chosen }
+
+  // Our answer for which day an arrival took off: departure board > correction/estimate
+  function departureDay(snapshots) {
+    const latest = snapshots[snapshots.length - 1];
+    if (dep && /^\d{4}-\d{2}-\d{2}$/.test(dep.row.departure_date || '')) {
+      return { guess: dep.row.departure_date, sure: true };
+    }
+    const timed = [...snapshots].reverse().find(s => toMinutes(s.st) !== null) || latest;
+    const est = estimateDeparture(flightNumber, latest.city || timed.city, date, timed.st);
+    if (!est || (est.date !== date && est.date !== dayBefore(date))) return { guess: null, sure: false };
+    return { guess: est.date, sure: est.sure };
   }
 
-  function openShareModal(text) {
-    renderPreview(text);
+  function relDay(iso) {
+    return iso === date ? 'the same day' : 'the night before';
+  }
+
+  function renderDaySure() {
+    const box = document.getElementById('share-day');
+    const from = shareCtx.origin ? ` from ${esc(shareCtx.origin)}` : '';
+    box.innerHTML = `
+      <div class="day-sure">
+        <span class="day-sure-text">🛫 Took off${from} ${relDay(shareCtx.chosen)} (${esc(dayLabel(shareCtx.chosen))})</span>
+        <button type="button" class="day-change">Change</button>
+      </div>`;
+  }
+
+  function renderDayQuestion() {
+    const box  = document.getElementById('share-day');
+    const prev = dayBefore(date);
+    const opt  = (iso, title) => {
+      const on = shareCtx.chosen === iso;
+      const tag = shareCtx.guess === iso ? ' · best guess' : '';
+      return `
+        <div class="day-opt${on ? ' is-on' : ''}">
+          <label>
+            <input type="radio" name="share-day" value="${iso}"${on ? ' checked' : ''}>
+            <span class="day-opt-title">${title}</span>
+            <span class="day-opt-date">${esc(dayLabel(iso))}${tag}</span>
+          </label>
+          <a href="${esc(shareCtx.fsUrlFor(iso))}" target="_blank" rel="noopener">Check ↗</a>
+        </div>`;
+    };
+    const where = shareCtx.origin ? ` from ${esc(shareCtx.origin)}` : '';
+    box.innerHTML = `
+      <fieldset class="day-q">
+        <legend>When did it take off${where}?</legend>
+        <p class="day-sub">Needed for the FlightStats link.${shareCtx.guess ? '' : ' We couldn’t work it out, so please pick one.'}</p>
+        <div class="day-opts">
+          ${opt(prev, 'Night before')}
+          ${opt(date, 'Same day')}
+        </div>
+        <p class="day-check">It’s right if it lands in Islamabad on ${esc(dayLabel(date))}.</p>
+      </fieldset>`;
+  }
+
+  function setShareDay(iso) {
+    const ta  = document.getElementById('share-text');
+    const url = shareCtx.fsUrlFor(iso);
+    ta.value = ta.value.split(shareCtx.fsUrl).join(url);
+    shareCtx.fsUrl  = url;
+    shareCtx.chosen = iso;
+    document.querySelectorAll('#share-day .day-opt').forEach(o => {
+      o.classList.toggle('is-on', o.querySelector('input').value === iso);
+    });
+  }
+
+  function openShareModal(snapshots) {
+    const latest    = snapshots[snapshots.length - 1];
+    const isArrival = (latest.type || '').toLowerCase() === 'arrival';
+    const fsUrlFor  = fsLinkMaker();
+    const box       = document.getElementById('share-day');
+
+    let fsDate = date;   // departures: Islamabad's date is the departure date
+    if (isArrival) {
+      const d = departureDay(snapshots);
+      fsDate = d.guess;
+      const origin = latest.city && latest.city !== '—' ? latest.city : '';
+      shareCtx = { fsUrlFor, fsUrl: fsUrlFor(fsDate), arrDate: date, origin,
+                   guess: d.guess, sure: d.sure, chosen: d.guess };
+      box.hidden = false;
+      if (d.sure) renderDaySure(); else renderDayQuestion();
+    } else {
+      shareCtx = null;
+      box.hidden = true;
+      box.innerHTML = '';
+    }
+
+    document.getElementById('share-text').value = buildShareText(snapshots, fsUrlFor(fsDate));
     document.getElementById('share-modal').classList.add('share-modal--open');
     document.body.style.overflow = 'hidden';
   }
@@ -361,8 +471,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.body.style.overflow = '';
   }
 
+  // FlightStats link for a departure date ('YYYY-MM-DD'), or with no date when null
+  function fsLinkMaker() {
+    const airline = getAirlineInfo(flightNumber);
+    // Strip the IATA prefix to get pure flight digits: 9P734 -> '734', PF125 -> '125'
+    const iataKey  = AIRLINE_INFO[flightNumber.slice(0,2).toUpperCase()] ? 2 : 1;
+    const digits   = flightNumber.slice(iataKey).replace(/[^0-9]/g, '');
+    const fsCode   = airline.fsCode   || flightNumber.replace(/[^A-Za-z]/g, '');
+    const fsSuffix = airline.fsSuffix || '';
+    const base = `https://www.flightstats.com/v2/flight-tracker/${fsCode}${fsSuffix}/${digits}`;
+    return iso => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+      return m ? `${base}?year=${m[1]}&month=${parseInt(m[2])}&date=${parseInt(m[3])}` : base;
+    };
+  }
+
   // Build the share message text from current page state
-  function buildShareText(snapshots) {
+  function buildShareText(snapshots, fsUrl) {
     const latest  = snapshots[snapshots.length - 1];
     const airline = getAirlineInfo(flightNumber);
 
@@ -373,29 +498,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const when    = latest.st ? `${latest.st} (${date})` : '—';
     const status  = latest.status || '—';
     const lastUpd = lastScrapeTime ? formatPKT(lastScrapeTime) : formatPKT(latest.scraped_at);
-
-    // FlightStats link: strip the IATA prefix to get pure flight digits
-    // e.g. 9P734 -> prefix is '9P' (2 chars) -> digits '734'
-    //      PF125 -> prefix is 'PF' (2 chars) -> digits '125'
-    const iataKey  = AIRLINE_INFO[flightNumber.slice(0,2).toUpperCase()] ? 2 : 1;
-    const digits   = flightNumber.slice(iataKey).replace(/[^0-9]/g, '');
-    const fsCode   = airline.fsCode   || flightNumber.replace(/[^A-Za-z]/g, '');
-    const fsSuffix = airline.fsSuffix || '';
-    // FlightStats files a flight under the day it departs its origin. Departures: Islamabad's date.
-    // Matched domestic arrivals: the departure board's date. Other arrivals: estimated (see
-    // estimatedDepartureDate); when that is unsure the link has no date.
-    let fsDate = date;
-    if (isArrival) {
-      const timed = [...snapshots].reverse().find(s => toMinutes(s.st) !== null) || latest;
-      fsDate = (dep && /^\d{4}-\d{2}-\d{2}$/.test(dep.row.departure_date || ''))
-        ? dep.row.departure_date
-        : estimatedDepartureDate(flightNumber, latest.city || timed.city, date, timed.st);
-    }
-    let fsUrl = `https://www.flightstats.com/v2/flight-tracker/${fsCode}${fsSuffix}/${digits}`;
-    if (fsDate) {
-      const [yr, mo, dy] = fsDate.split('-');
-      fsUrl += `?year=${yr}&month=${parseInt(mo)}&date=${parseInt(dy)}`;
-    }
 
     const pageUrl = window.location.href;
 
@@ -432,10 +534,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.id        = 'share-btn';
     btn.className = 'share-trigger-btn';
     btn.innerHTML = '🔗 Share Flight';
-    btn.addEventListener('click', () => {
-      const text = buildShareText(snapshots);
-      openShareModal(text);
-    });
+    btn.addEventListener('click', () => openShareModal(snapshots));
 
     (flightInfoDiv.querySelector('.fi-head') || flightInfoDiv).appendChild(btn);
   }
