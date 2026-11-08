@@ -6,6 +6,7 @@ Public repo: no email, phone, credentials or security details in this file.
 
 ## 1. Current handoff
 
+- **2026-11-08:** BL-039 (FlightStats link date) is on branch `fix/flightstats-departure-date`, checked in a stubbed browser, not merged. Waiting on the owner's city list (query in BL-039). BL-040 captured: real origin times from a cheap flight-data service.
 - **Goal now:** live-check the BL-036 details card, switch on the contact form (needs the owner's key), then pick one small task.
 - **Owner reports:** everything is working; both collectors are running; an external cron-job.org job dispatches both workflows about every 15 minutes.
 - **Site fixes live since 2026-11-01:** 7 files under `docs/` merged to `main` (PR #5, commit `9d4e72f`). Checked in a local headless browser against a stubbed database (18 checks pass; the same checks fail on the old files) and, per the owner's report on 2026-11-01, **checked on the live site**. The contact form is applied but **not switched on** (no access key yet).
@@ -76,7 +77,111 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-039** *New 2026-11-08 (owner report).* FlightStats files a flight under the date it leaves its origin (confirmed on FlightStats: PK246 Dammam 23:30 on 10 Oct, Islamabad 05:35 on 11 Oct, listed under 10 Oct). The share link used the page date, which for arrivals is Islamabad's arrival date, so overnight arrivals opened the next day's flight. Fix in `docs/flight_detail.js` (`buildShareText`, `estimatedDepartureDate`):
+One queue. IDs are never reused. Next unused ID: **BL-041**. BL-010A..D are children of BL-010.
+States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
+
+| ID | Type | Pri | Size | State | Task |
+|---|---|---|---|---|---|
+| BL-001 | chore | P2 | S | Ready | Document actual scheduler setup (cron-job.org target, interval, retries, recent outcomes) |
+| BL-002 | bug | P1 | S | Ready | Use PKT airport dates in both collectors |
+| BL-003 | bug | P2 | S | Done | Saved history when the Supabase script fails to load |
+| BL-004 | bug | P2 | S | Done | Share text: correct Arrival/Departure label |
+| BL-005 | bug | P2 | S | Cancelled | Plain contact email (superseded by BL-028 / D-014) |
+| BL-006 | chore | P2 | M | Ready | Unify flight-number normalisation |
+| BL-007 | bug | P1 | M | Done | Render external values safely (no raw `innerHTML`) |
+| BL-008 | chore | P3 | S | Done | Put analytics scripts inside `<head>` |
+| BL-009 | chore | P2 | M | Ready | Timestamp storage and display contract (label PKT) |
+| BL-010 | feature | P2 | L | Blocked | Origin-airport context on domestic Islamabad arrivals (parent) |
+| BL-010A | research | P1 | S | Ready | Validate current origin collection |
+| BL-010B | bug | P1 | M | Testing | Leg-pairing view `isb_arrival_origin_view` (SQL in section 5). Applied by the owner 2026-11-04; first result 133 matched, 531 unmatched (see BL-010A progress) |
+| BL-010C | feature | P2 | M | Proposed | Departure-airport box on the details page (branch ready; merge only after the BL-010B view exists) |
+| BL-010D | research | P3 | M | Inbox | Evaluate full reader migration later |
+| BL-031 | bug | P1 | S | Proposed | Origin collector: fetch yesterday's departures in the early morning so overnight legs keep updating (with BL-002 PKT dates) |
+| BL-033 | bug | P1 | S | Inbox | Multan returns HTTP 500 from the PAA API on every run, so Multan has no rows at all; the Multan collection is wasted calls and Multan-origin flights never pair |
+| BL-034 | feature | P2 | M | Inbox | Add more origin airports? About 76% of Islamabad arrivals come from airports we do not watch (international and other Pakistani cities); decide which to add once the city list is known |
+| BL-035 | research | P2 | S | Inbox | Explain 9 unmatched arrivals from watched airports that do have departure rows (missing rows for today's flights; PA204 numbering; PK368 8 h gap) |
+| BL-036 | feature | P1 | S | Testing | Details page as one journey card: flight number, then Islamabad's line (large), then the departure airport's line (smaller), with early/late wording, "first seen departed" time and a note when the two boards disagree. Merged 2026-11-04 (PR #11); checked in a stubbed browser (6 scenarios x 4 widths), live check pending |
+| BL-038 | feature | P1 | S | Testing | Islamabad-first details page (owner decisions 2026-11-06). Islamabad's line stays on top. A one-line notice appears only when the departure board is fresh (under 60 min) and shows something Islamabad's has not: cancelled; departed (with the time we first saw it) while Islamabad shows no landed/departed/airborne status; or 15+ min later than Islamabad's expected time (`NOTICE_MINUTES`). History has an "Airport board" switch (Islamabad arrivals / <city> departures) on matched domestic arrivals only; it switches the history table, not the top line. Long notes removed; the "not aircraft position" note moved to About. Table: plain headers, short dates, fixed columns on phones, Change column hidden under 360 px. Stubbed-browser checks pass (11 cases x 320/375/768/1280 px). Live check pending |
+| BL-037 | research | P2 | S | Inbox | Departure boards rarely show when a flight actually left: owner saw Islamabad say "Advanced" (30 min early) while Karachi showed only the scheduled time. Check one raw PAA departure response for fields the collector drops (it keeps only ST, ET, remarks), and how ET/remarks change after take-off |
+| BL-032 | feature | P1 | M | Testing | Switch search, history and details to the origin tables via two Islamabad-only views, with fallback to the old tables; always fetch yesterday for Islamabad (D-015). Merged 2026-11-04 (PR #10); live checks pending |
+| BL-011 | feature | P3 | L | Inbox | Flight-change notifications |
+| BL-012 | feature | P3 | M | Inbox | Adaptive scrape frequency |
+| BL-013 | chore | P3 | M | Inbox | Batch database work where measured |
+| BL-014 | idea | P3 | L | Inbox | Actual aircraft tracking |
+| BL-015 | idea | P3 | L | Inbox | Fare and booking-window research |
+| BL-016 | chore | P3 | M | Inbox | README, sitemap, logo housekeeping |
+| BL-017 | chore | P1 | M | Ready | Restrict public database privileges (evidence kept private) |
+| BL-018 | research | P2 | M | Inbox | Evaluate Islamabad relevance filter safely |
+| BL-019 | bug | P1 | M | Inbox | Overnight and duplicate canonical matching |
+| BL-020 | research | P2 | S | Inbox | Measure retention and storage before extending |
+| BL-021 | bug | P1 | M | Ready | Report honest freshness and batch outcomes |
+| BL-022 | bug | P1 | M | Testing | Keep direction in flight history identity |
+| BL-023 | bug | P2 | S | Ready | Preserve labels and saved filter state (label part done; city and stale filters still open) |
+| BL-024 | bug | P2 | M | Ready | Share actual current state and retained route |
+| BL-025 | bug | P1 | M | Ready | Guard against false drops from partial feeds |
+| BL-026 | chore | P2 | M | Inbox | Avoid overlapping writers; pin environment |
+| BL-027 | research | P2 | M | Inbox | Diagnose disabled TLS verification |
+| BL-028 | feature | P1 | M | Testing | Contact form with callback option; footer repaired and email removed (done). Not live until the owner's form key is pasted and a test message arrives |
+| BL-029 | bug | P2 | S | Done | Search page default date used the UTC date, not Pakistan's |
+| BL-030 | bug | P2 | S | Done | Flight details page layout: unstyled header, table overflow, unreadable share links |
+| BL-039 | bug | P2 | S | Proposed | Share text: FlightStats link used Islamabad's arrival date, so overnight arrivals linked to the wrong day's flight. Now uses the departure board's date for matched domestic arrivals and an estimate (origin time zone + typical flight time, with a per-flight correction list) for the rest |
+| BL-040 | research | P2 | M | Inbox | Real origin departure times for international arrivals from a flight-data service (AeroDataBox airport board), replacing BL-039's estimate where available |
+
+### Task records
+
+**BL-001** Record sanitised cron-job.org settings (target, ref, interval, retries) and the latest outcomes of both workflows. Do not recreate the workflow files. Accept: settings and latest coverage/failure evidence recorded, owner reports kept separate from log checks. Note: the origin job has a 22-minute timeout but is dispatched every ~15 minutes, so overlap is possible (BL-026).
+
+**BL-002** Both `main()` functions use naive `datetime.now()`. Fix: `from zoneinfo import ZoneInfo` and `datetime.datetime.now(ZoneInfo("Asia/Karachi"))` for the date list only; leave the UTC `fetched_at` lines. Accept: fixtures around 00:00 and 05:00 PKT pick the right dates, both files pass a syntax check, an applied run's log shows the right dates. Impact is small (see section 1), so it should not displace BL-017.
+
+**BL-003** The Supabase guard (script.js line 3) returns before `renderHistory()` (line 24); the reported symptom is not reproduced. Check: block the CDN or break storage, confirm what renders; look for "Supabase failed to load." in the console and `localStorage.getItem('flightHistory')`. Accept: saved history renders and search failure is explained, without deleting saved data. Fix idea: render history and attach handlers before the guard; add a fallback CDN or self-host. Distinct from BL-023.
+
+**BL-004** Share text uses "Departure" for arrivals (`flight_detail.js:242`). Use the selected flight's direction, not an assumed route. Accept: one arrival and one departure share with right labels and unchanged date/time.
+
+**BL-005** Cancelled 2026-11-01: the owner does not want any email on the site. See BL-028.
+
+**BL-006** Original strips spaces, newer strips spaces and hyphens, frontend also uppercases and strips underscores; legacy rows may hold spaces. Accept: one shared rule with examples, a collision and legacy migration plan before any update, both paths find equivalent forms.
+
+**BL-007** Search and details insert city/status/flight strings through `innerHTML`; city names also go into `<option value>`. Use DOM/`textContent` or an escape helper. Accept: an HTML-like fixture renders as plain text in options, cards and history; search and sharing still work.
+
+**BL-008** Move the gtag blocks inside `<head>` where they sit outside it. Tidy-up only.
+
+**BL-009** Original observations are timezone-less, newer are aware, raw update timestamps differ. Accept: generated vs source semantics documented, fixtures display correct PKT, no blind database cast, any migration proposed separately from display changes. Includes labelling ST/ET as PKT in the UI.
+
+**BL-010 / A / B / C / D** Parent initiative, done in children. **A:** read source registry and status, and the newest origin-workflow logs; confirm valid origin airports and freshness; spot batch failures behind a green run. **B** (blocked on A): rank ties, wrong-airport rows, duplicate matches, missing routes and same-date joins; deterministic leg pairs on sanitised fixtures; no ambiguous +/-1 day matches. **C** (blocked on B and the Open question 2): for a domestic arrival show departure-board status, ST/ET, source and its own time; test valid, missing, stale and conflicting data; header and Islamabad history unchanged; never claim actual aircraft location. **D:** optional, compare coverage, history window, performance, rollback before any cutover or retirement. *Progress 2026-11-02 on B and C:* view written and run against 11 synthetic cases on a local Postgres 16 (same day, overnight, daily flight, no departure row, international, empty time, source priority, gap over 6 h, departure after arrival, wrong route); details box tested with a stubbed database (15 checks: matched, stale, unmatched, missing view, hostile text, 320 to 1280 px). Neither is applied to the live database or merged to `main`. *Progress 2026-11-04 (live results, owner ran the queries):* column types confirmed (`scheduled_date` date; `st`, `et`, `last_updated` text; `last_checked` and `scraped_at` timestamptz; the columns are lowercase `st`/`et`, so SQL must not quote them). Of 665 Islamabad arrival flights (28 Oct to 5 Nov): **133 matched**; **508** come from airports we do not watch (international and other Pakistani cities, so they cannot pair by design); **15** have no departure row anywhere (flight codes such as APESL, APFFL, APHKD, 9P9960, Z8921, which look like positioning or charter flights, not scheduled service); **9** have departure rows but did not pair. Of the arrivals from the five watched airports, about 85% paired (133 of 157). Of the 9: PF127, 9P678 and PA204 lack a departure row for 4 Nov at Karachi while other days exist; PA204's earlier arrivals (28 to 31 Oct) have no Karachi departure rows at all; PK368 on 4 Nov has a Karachi departure at 13:30 but arrives 21:55 (gap 8 h 25 min, outside the 6 h rule). Cause unknown (BL-035). Coverage in `origin_flights` 28 Oct to 5 Nov for Islamabad, Karachi, Lahore, Peshawar and Faisalabad, all checked within about 3 minutes of each other; **Multan has no rows**: the latest origin run log shows HTTP 500 from the PAA API for every Multan call (BL-033). The run log also shows the PKT date line working (`Fetching ['2026-11-04', '2026-11-05']`). *Progress 2026-11-02 on A:* source registry read (only `paa` in use); origin status was fresh. Still to do: confirm which origin airports report valid data and look for batch failures in the logs.
+
+**BL-011** Need channel, recipients, opt-in, triggers, identity and cost decisions; do not assume Telegram or accounts. Split before implementing.
+
+**BL-012** Near-flight polling is a proposal; measure useful freshness and run duration first; avoid duplicate scheduling (the external scheduler already dispatches).
+
+**BL-013** Per-record SELECT and upsert remain; only snapshots batch. Optimise from a measured bottleneck with equivalent change/drop behaviour.
+
+**BL-014 / BL-015** Aircraft position and fare research need new sources, cost and agreement first.
+
+**BL-016** Sitemap lists `flight_detail.html` (useless without query parameters); non-local airline logos hotlink `pics.avs.io`; README to become a short pointer to these two files.
+
+**BL-017** Confirmed by the private owner-supplied report: excess public write privileges and missing protection on one status table. Need an explicit relation/role plan, a view security review, and preserved collector access. Accept: public reads work, unnecessary public writes denied, collector writes preserved, inherited privileges considered, safe non-destructive verification. **Keep the evidence and the SQL private** (not in this repo, not in public chats). Owner's read-only check on 2026-11-02 shows the issue is still present.
+
+**BL-018** Setting `REQUIRE_ISB_LEG = True` excludes unrelated rows from the "seen" set, so drop detection would mark existing unrelated rows Dropped. Deleting data is not a prerequisite and has no rollback without an export. Accept: filter and drop scope defined together, retained unrelated rows not falsely dropped, owner approves before the flag flips, no hidden cleanup. (This replaces my earlier suggestion to delete rows first.)
+
+**BL-019** The same-day join splits overnight legs; wrong-airport rows can multiply results. Need real affected examples. Accept: daily-flight and midnight fixtures give correct pairs or an explicit "ambiguous/unavailable", ties resolved deterministically.
+
+**BL-020** 23 MB is a point-in-time size, not a forecast. Collect 7-14 days of comparable growth, learn quota headroom, then choose a window. No extension just for the origin box.
+
+**BL-021** Both collectors advance run health after failed or empty feeds; the new one catches failed batches. A green workflow is not enough. Accept: failure, empty and success separated, coverage recorded, stale/partial UI honest, total failure cannot look fully fresh.
+
+**BL-022** *Proposed with BL-032 (history links now carry `&type=`; old links keep the direction of their first record).* In plain words: an arrival and a departure can share a flight number on the same date (the plane arrives, then leaves as the same number). The database keeps them apart, but the details link only had number and date, so the page could mix the two lists into one history. The database key includes direction (`type`) but detail URLs use only number and date, so an arrival and departure with the same number can mix. Accept: URLs, header, history and share isolate direction; old links handled; same number/date fixture tested.
+
+**BL-023** Saving again resets the custom label, city is not saved, replay can keep stale filters. Accept: label survives repeat and replay, full filters restored, malformed storage recovers.
+
+**BL-024** Share uses the latest event snapshot; a dropped snapshot lacks route and time; unknown airline prefixes may build invalid verification links. Accept: right current state and route with dropped/no-history fixtures, supported links accurate, absent links omitted.
+
+**BL-025** One partial non-empty response can mark missing flights Dropped. Agree a repeated-miss or coverage rule. Accept: outage, partial and reappearance fixtures pass, route context retained.
+
+**BL-026** No workflow concurrency guard or dependency manifest. Measure both collectors first; do not add GitHub schedules on top of the external one. Accept: overlap policy and dependencies defined, run duration observed, safe scheduling handoff documented.
+
+**BL-027** Both collectors use `verify=False`. Diagnose the certificate chain before choosing a verified alternative. Accept: verified TLS works, or a narrow justified exception.
+
+**BL-039** *New 2026-11-08 (owner report).* FlightStats files a flight under the date it leaves its origin (confirmed on FlightStats: PK246 Dammam 23:30 on 10 Oct, Islamabad 05:35 on 11 Oct, listed under 10 Oct). The share link used the page date, which for arrivals is Islamabad's arrival date, so overnight arrivals opened the next day's flight. Fix in `docs/flight_detail.js` (`buildShareText`, `estimatedDepartureDate`):
 - Departures: Islamabad's date (unchanged).
 - Matched domestic arrivals: `departure_date` from `isb_arrival_origin_view`.
 - Other arrivals (international, unwatched airports, view missing): Islamabad scheduled arrival minus the typical flight time from `ORIGIN_TIMES` (city -> time zone, minutes), read as a date in the origin's time zone. Within 45 minutes of midnight at the origin (10 with a correction), or for a city not in the table or a missing time, the link has no date and FlightStats shows the flight nearest to now. Owner decision 2026-11-08: estimate, with a way to correct.
@@ -84,6 +189,13 @@ One queue. IDs are never reused. Next unused ID: **BL-039** *New 2026-11-08 (own
 - Flight times in `ORIGIN_TIMES` are Claude's estimates, not checked against timetables; only PK246 is confirmed. City spellings are guesses until checked against the board: run `SELECT city, count(*) FROM public.isb_flights_view WHERE type = 'Arrival' GROUP BY 1 ORDER BY 2 DESC;` and add any city missing from the table.
 - Also renamed a local `dep` variable in `buildShareText` that hid the departure data.
 - Checks: 18 stubbed-browser cases pass 2026-11-08 (matched overnight and same day, unmatched and view-missing domestic, Dubai same day and overnight, Kuwait overnight and near midnight, correction list, spelling variant, London winter and summer, Toronto, unknown city, missing time, departure). Live: share an overnight international arrival (e.g. one landing 02:00 to 06:00) and confirm FlightStats opens that flight.
+
+**BL-040** *New 2026-11-08 (owner asked for the cheapest real source).* User need: the real departure date and time at the origin for international arrivals (share link, and possibly a "left Dubai at ..." line), instead of BL-039's estimate. FlightStats itself is not usable (no free API for a public site; scraping is against its terms).
+- Candidate (researched 2026-11-08, not tried): AeroDataBox airport board (FIDS) for ISB arrivals with `withLeg=true`, which adds "times of departure from the origin for arriving flights, if available". Tier 2 = 2 units per call. Two calls a day (12-hour windows; window limit not confirmed) is about 120 units a month. Plans: free Basic 400 units/month (RapidAPI "free forever", API.Market 7-day trial), non-commercial only and attribution required; Pro $7.50-8/month for 5,000 units, commercial use allowed, no attribution. Data may be stored 7 days only, which matches the origin tables' retention. Flight-status-by-number also takes `dateLocalRole=Arrival`, but that is one call per flight.
+- Free partial alternative already researched (project doc on airline sites): Airblue, PIA and Fly Jinnah status pages give both ends' scheduled times for their own international legs. Foreign carriers not covered.
+- Shape: small collector step (GitHub Action, key as a secret) writing one row per flight number + ISB arrival date with the origin's scheduled departure (local, with time zone), `data_source` registered in `source_priority`; the share link prefers it over the estimate.
+- Accept: for a day of ISB international arrivals, the stored origin dates match FlightStats for a sample of 10 flights including 3 overnight ones; units used per month recorded; terms re-checked against how the site is run (ads or not).
+- Blockers: owner signs up and picks a plan; confirm FIDS window limit and that `withLeg` gives scheduled (not only actual) departure times.
 
 **BL-028** *New 2026-11-01.* User need: visitors can reach the owner without the owner publishing an email address or phone number (D-014).
 - Approach: a plain HTML form posts to a hosted form service, which emails the owner. The service stores the destination address in its dashboard or behind a form key, so the page source contains neither. Candidates: Web3Forms (no account) or Formspree; check current free limits `[UNVERIFIED]`.
@@ -232,9 +344,9 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 
 ## 7. Journal (newest first)
 
-### 2026-11-08 | Claude | BL-039 FlightStats date
-- Done: share link uses the origin's departure date: departure board for matched domestic arrivals; estimate from a city table (time zone, flight time) with a per-flight correction list for the rest; no date when too close to midnight. 18 stubbed cases pass. Branch `fix/flightstats-departure-date`.
-- Next: owner runs the city query above and sends the list; merge; check one overnight international share live.
+### 2026-11-08 | Claude | BL-039 FlightStats date, BL-040 captured
+- Done: share link uses the origin's departure date: departure board for matched domestic arrivals; estimate from a city table (time zone, flight time) with a per-flight correction list for the rest; no date when too close to midnight. 18 stubbed cases pass. Branch `fix/flightstats-departure-date`, not merged. Captured BL-040 (real origin times from AeroDataBox).
+- Next: owner runs the city query in BL-039 and sends the list; merge; check one overnight international share live.
 
 ### 2026-11-06 | Claude | BL-038 Islamabad-first page
 - Done: owner set the rule: show Islamabad only, unless the departure board has an update Islamabad's doesn't reflect; departure-board history behind a labelled "Airport board" switch; Islamabad's top line fixed. Agreed from chat mockups first (no test switches in code). Built the notice (cancelled / departed / 15+ min later; owner said "16", taken as the 15 discussed), the switch, shorter table dates and plain headers, About-page note. 11 stubbed scenarios x 4 widths pass, including a deliberately long status word; the older test that looked for the removed departure box is retired.
