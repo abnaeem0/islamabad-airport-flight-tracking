@@ -6,6 +6,7 @@ Public repo: no email, phone, credentials or security details in this file.
 
 ## 1. Current handoff
 
+- **2026-11-09 (later):** BL-041 (tap a search result to open it; History button replaced by an arrow) on branch `card-click-opens-details`, checked in a stubbed browser, not merged. Owner: tap a few results on a phone, then merge.
 - **2026-11-09:** BL-039 (FlightStats link date, share box asks the sender when unsure) is on branch `fix/flightstats-departure-date`, checked in a stubbed browser, not merged. Waiting on the owner's phone review and city list (query in BL-039). BL-040 captured: real origin times from a cheap flight-data service, later. IDs may clash with another chat's unmerged PLAN.md (BL-039 to BL-043): renumber before merging.
 - **Goal now:** live-check the BL-036 details card, switch on the contact form (needs the owner's key), then pick one small task.
 - **Owner reports:** everything is working; both collectors are running; an external cron-job.org job dispatches both workflows about every 15 minutes.
@@ -77,7 +78,7 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-041**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-042**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -126,6 +127,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-030 | bug | P2 | S | Done | Flight details page layout: unstyled header, table overflow, unreadable share links |
 | BL-039 | bug | P2 | S | Proposed | Share text: FlightStats link used Islamabad's arrival date, so overnight arrivals linked to the wrong day's flight. Now the share box shows which day it took off: departure board for matched domestic arrivals, else an estimate (origin time zone + typical flight time, per-flight correction list); any doubt -> the sender picks Night before / Same day. Message editable; Copy, Share, WhatsApp |
 | BL-040 | research | P2 | M | Inbox | Real origin departure times for international arrivals from a flight-data service (AeroDataBox airport board), replacing BL-039's estimate where available |
+| BL-041 | feature | P2 | S | Proposed | Search results: tapping anywhere on a flight card opens its details page; the "History" button is replaced by a `›` arrow (owner 2026-11-09: the button was not intuitive) |
 
 ### Task records
 
@@ -193,6 +195,9 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 - Free partial alternative already researched (project doc on airline sites): Airblue, PIA and Fly Jinnah status pages give both ends' scheduled times for their own international legs. Foreign carriers not covered.
 - Shape: small collector step (GitHub Action, key as a secret) writing one row per flight number + ISB arrival date with the origin's scheduled departure (local, with time zone), `data_source` registered in `source_priority`; the share link prefers it over the estimate.
 - Accept: for a day of ISB international arrivals, the stored origin dates match FlightStats for a sample of 10 flights including 3 overnight ones; units used per month recorded; terms re-checked against how the site is run (ads or not).
+
+**BL-041** *New 2026-11-09 (owner request).* Actual: a search result opened only through its small "History" button. Expected: tap the flight itself. Built in `docs/script.js` (each card is now an `<a href>` to the details page, same URL as before including `&type=`; `window.viewHistory` replaced by a local `detailUrl`, nothing else used it) and `docs/style.css` (link card without underline, visible keyboard focus, `›` arrow pinned to the right edge even when a logo fails; the phone rule that made the button full width removed). Being a real link, long-press / middle-click / open in new tab also work.
+- Checks (2026-11-09, stubbed browser): two cards render as links with no button; a click in the middle of the card text opens `flight_detail.html?flight=…&date=…&type=…`; HTML in city text stays text; arrow at the right edge with and without a logo; no sideways scroll at 320/375/768/1280 px. Live: tap a card on a phone; check the back button returns to the results.
 - Blockers: owner signs up and picks a plan; confirm FIDS window limit and that `withLeg` gives scheduled (not only actual) departure times.
 
 **BL-028** *New 2026-11-01.* User need: visitors can reach the owner without the owner publishing an email address or phone number (D-014).
@@ -341,6 +346,10 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 **Done 2026-11-04.** Kept for reference. After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-09 (later) | Claude | BL-041 tap card to open
+- Done: whole search-result card is a link to the details page; "History" button replaced by a `›` arrow. Stubbed-browser checks at 320 to 1280 px pass. Branch `card-click-opens-details`, not merged.
+- Next: owner phone check, merge.
 
 ### 2026-11-09 | Claude | BL-039 share box: departure day
 - Done: share box asks which day an arrival took off whenever there is doubt (Night before / Same day, guess preselected, Check links), else one line with Change; editable message; Copy, Share, WhatsApp. 20 date cases and interaction/width checks pass in a stubbed browser. Branch `fix/flightstats-departure-date`, not merged. BL-040 captured 2026-11-08 (AeroDataBox for later).

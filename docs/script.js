@@ -137,8 +137,10 @@ document.addEventListener('DOMContentLoaded', () => {
       // Render results
       resultsDiv.innerHTML = '';
       filtered.forEach(f => {
-        const card = document.createElement('div');
+        // The whole card is a link to the details page (BL-041): tap anywhere on the flight
+        const card = document.createElement('a');
         card.className = 'flight-card';
+        card.href      = detailUrl(f.flight_number, date, f.type);
 
         const img = document.createElement('img');
         img.src     = getLogoUrl(f.flight_number);
@@ -154,13 +156,14 @@ document.addEventListener('DOMContentLoaded', () => {
           <br>ST: ${esc(f.st ?? '—')} | ET: ${esc(f.et ?? '—')} | Status: ${esc(f.status ?? '—')}
         `;
 
-        const btn = document.createElement('button');
-        btn.textContent = 'History';
-        btn.addEventListener('click', () => viewHistory(f.flight_number, date, f.type));
+        const chevron = document.createElement('span');
+        chevron.className   = 'flight-card-chevron';
+        chevron.textContent = '›';
+        chevron.setAttribute('aria-hidden', 'true');
 
         card.appendChild(img);
         card.appendChild(info);
-        card.appendChild(btn);
+        card.appendChild(chevron);
         resultsDiv.appendChild(card);
       });
 
@@ -345,10 +348,10 @@ document.addEventListener('DOMContentLoaded', () => {
     searchBtn.click();
   };
 
-  window.viewHistory = function(flightNumber, date, type) {
+  function detailUrl(flightNumber, date, type) {
     // type keeps an arrival and a departure with the same number apart (BL-022)
     const typePart = type ? `&type=${encodeURIComponent(type)}` : '';
-    window.location.href = `flight_detail.html?flight=${encodeURIComponent(flightNumber)}&date=${encodeURIComponent(date)}${typePart}`;
-  };
+    return `flight_detail.html?flight=${encodeURIComponent(flightNumber)}&date=${encodeURIComponent(date)}${typePart}`;
+  }
 
 });
