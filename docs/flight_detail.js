@@ -312,8 +312,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div id="share-wa-row">
             <label for="share-wa-input">Send on WhatsApp (to yourself or anyone)</label>
             <div id="share-wa-input-row">
-              <span id="share-wa-prefix">+92</span>
-              <input id="share-wa-input" type="tel" maxlength="10" placeholder="3001234567" inputmode="numeric">
+              <span id="share-wa-prefix">+<input id="share-wa-code" type="tel" inputmode="numeric" maxlength="4" value="92" aria-label="Country code"></span>
+              <input id="share-wa-input" type="tel" maxlength="15" placeholder="3001234567" inputmode="numeric" aria-label="WhatsApp number">
               <button id="share-wa-btn" class="share-btn share-btn--whatsapp" aria-label="Send on WhatsApp">
                 <svg id="share-wa-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.558 4.122 1.532 5.862L.057 23.428a.75.75 0 0 0 .916.916l5.566-1.475A11.944 11.944 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.694 9.694 0 0 1-4.953-1.357l-.355-.211-3.683.975.993-3.585-.232-.369A9.695 9.695 0 0 1 2.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/></svg>
                 Send
@@ -352,12 +352,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // WhatsApp button
     document.getElementById('share-wa-btn').addEventListener('click', () => {
-      const raw = document.getElementById('share-wa-input').value.trim().replace(/\D/g, '');
-      if (!raw) {
-        document.getElementById('share-wa-input').focus();
-        return;
-      }
-      const number = '92' + raw.replace(/^0+/, '');
+      const code = document.getElementById('share-wa-code').value.replace(/\D/g, '');
+      const raw  = document.getElementById('share-wa-input').value.trim().replace(/\D/g, '');
+      if (!code) { document.getElementById('share-wa-code').focus(); return; }
+      if (!raw)  { document.getElementById('share-wa-input').focus(); return; }
+      const number = code + raw.replace(/^0+/, '');   // country code (default 92) + number without its leading 0
       window.open(`https://wa.me/${number}?text=${encodeURIComponent(messageText())}`, '_blank');
     });
 
@@ -386,16 +385,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     return { guess: est.date, sure: est.sure };
   }
 
-  function relDay(iso) {
-    return iso === date ? 'the same day' : 'the night before';
-  }
-
   function renderDaySure() {
     const box = document.getElementById('share-day');
-    const from = shareCtx.origin ? ` from ${esc(shareCtx.origin)}` : '';
+    const from = shareCtx.origin ? ` leaving ${esc(shareCtx.origin)}` : '';
     box.innerHTML = `
       <div class="day-sure">
-        <span class="day-sure-text">🛫 Took off${from} ${relDay(shareCtx.chosen)} (${esc(dayLabel(shareCtx.chosen))})</span>
+        <span class="day-sure-text">🛫 FlightStats: flight${from} on ${esc(dayLabel(shareCtx.chosen))}</span>
         <button type="button" class="day-change">Change</button>
       </div>`;
   }
@@ -403,29 +398,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderDayQuestion() {
     const box  = document.getElementById('share-day');
     const prev = dayBefore(date);
-    const opt  = (iso, title) => {
+    const opt  = iso => {
       const on = shareCtx.chosen === iso;
-      const tag = shareCtx.guess === iso ? ' · best guess' : '';
       return `
         <div class="day-opt${on ? ' is-on' : ''}">
           <label>
             <input type="radio" name="share-day" value="${iso}"${on ? ' checked' : ''}>
-            <span class="day-opt-title">${title}</span>
-            <span class="day-opt-date">${esc(dayLabel(iso))}${tag}</span>
+            <span class="day-opt-title">${esc(dayLabel(iso))}</span>
+            <span class="day-opt-date">${shareCtx.guess === iso ? 'best guess' : '&nbsp;'}</span>
           </label>
           <a href="${esc(shareCtx.fsUrlFor(iso))}" target="_blank" rel="noopener">Check ↗</a>
         </div>`;
     };
-    const where = shareCtx.origin ? ` from ${esc(shareCtx.origin)}` : '';
+    const where = shareCtx.origin ? ` ${esc(shareCtx.origin)}` : '';
     box.innerHTML = `
       <fieldset class="day-q">
-        <legend>When did it take off${where}?</legend>
-        <p class="day-sub">Needed for the FlightStats link.${shareCtx.guess ? '' : ' We couldn’t work it out, so please pick one.'}</p>
+        <legend>Which day does it leave${where}?</legend>
+        ${shareCtx.guess ? '' : '<p class="day-sub">We couldn’t work it out, so please pick one.</p>'}
         <div class="day-opts">
-          ${opt(prev, 'Night before')}
-          ${opt(date, 'Same day')}
+          ${opt(prev)}
+          ${opt(date)}
         </div>
-        <p class="day-check">It’s right if it lands in Islamabad on ${esc(dayLabel(date))}.</p>
+        <p class="day-check">FlightStats lists flights by the day they leave. The right one lands in Islamabad on ${esc(dayLabel(date))}.</p>
       </fieldset>`;
   }
 

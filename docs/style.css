@@ -1240,6 +1240,20 @@ p.error {
   transition:    border-color 0.2s, box-shadow 0.2s;
 }
 #share-wa-input::placeholder { color: var(--text-muted); }
+#share-wa-prefix { display: inline-flex; align-items: center; }
+#share-wa-code {
+  width:       2.6em;
+  padding:     0 0 0 0.1rem;
+  background:  transparent;
+  border:      none;
+  outline:     none;
+  color:       var(--text);
+  font:        inherit;
+}
+#share-wa-prefix:focus-within {
+  border-color: var(--accent);
+  box-shadow:   0 0 0 3px var(--accent-glow);
+}
 #share-wa-input:focus {
   border-color: var(--accent);
   box-shadow:   0 0 0 3px var(--accent-glow);
