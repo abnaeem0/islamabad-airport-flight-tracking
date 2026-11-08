@@ -348,23 +348,27 @@ p.error {
   color: var(--text-muted);
 }
 
-.flight-card button {
-  padding: 0.4rem 1rem;
-  font-family: 'Sora', sans-serif;
-  font-size: 0.8rem;
-  font-weight: 600;
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  border-radius: 6px;
+/* The card is a link (BL-041): no underline, keyboard focus visible */
+a.flight-card {
+  text-decoration: none;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-  white-space: nowrap;
 }
 
-.flight-card button:hover {
-  background: var(--accent);
-  color: #fff;
+a.flight-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.flight-card-chevron {
+  grid-column: 3;  /* stays at the right edge even when a logo fails to load and is hidden */
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--accent);
+  transition: transform 0.15s;
+}
+
+.flight-card:hover .flight-card-chevron {
+  transform: translateX(3px);
 }
 
 /* =========================
@@ -849,12 +853,7 @@ p.error {
   }
 
   .flight-card {
-    grid-template-columns: auto 1fr;
-  }
-
-  .flight-card button {
-    grid-column: 1 / -1;
-    width: 100%;
+    gap: 0.75rem;
   }
 }
 

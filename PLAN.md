@@ -6,7 +6,8 @@ Public repo: no email, phone, credentials or security details in this file.
 
 ## 1. Current handoff
 
-- **2026-11-09:** BL-039 (FlightStats link date, share box asks the sender when unsure, editable message, any WhatsApp country code) is merged to main, checked in a stubbed browser only. Waiting on the owner's phone check and city list (query in BL-039). BL-040 captured: real origin times from a cheap flight-data service, later. IDs may clash with another chat's unmerged PLAN.md (BL-039 to BL-043): renumber before merging.
+- **2026-11-09 (later):** BL-041 (tap a search result to open it; History button replaced by an arrow) and BL-042 (search kept in the address, so Back/reload/shared links show the same results and scroll) merged to `main` by the owner's instruction, checked in a stubbed browser. Owner: on a phone, search, open a flight, press Back; rollback is reverting the two merge commits.
+- **2026-11-09:** BL-039 (FlightStats link date, share box asks the sender when unsure, editable message, any WhatsApp country code) is merged to main, checked in a stubbed browser only. Waiting on the owner's phone check and city list (query in BL-039). BL-040 captured: real origin times from a cheap flight-data service, later. 
 - **Goal now:** live-check the BL-036 details card, switch on the contact form (needs the owner's key), then pick one small task.
 - **Owner reports:** everything is working; both collectors are running; an external cron-job.org job dispatches both workflows about every 15 minutes.
 - **Site fixes live since 2026-11-01:** 7 files under `docs/` merged to `main` (PR #5, commit `9d4e72f`). Checked in a local headless browser against a stubbed database (18 checks pass; the same checks fail on the old files) and, per the owner's report on 2026-11-01, **checked on the live site**. The contact form is applied but **not switched on** (no access key yet).
@@ -77,7 +78,7 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-041**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-043**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -126,6 +127,8 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-030 | bug | P2 | S | Done | Flight details page layout: unstyled header, table overflow, unreadable share links |
 | BL-039 | bug | P2 | S | Proposed | Share text: FlightStats link used Islamabad's arrival date, so overnight arrivals linked to the wrong day's flight. Now the share box shows which day it took off: departure board for matched domestic arrivals, else an estimate (origin time zone + typical flight time, per-flight correction list); any doubt -> the sender picks the departure date. Message editable; Copy, Share, WhatsApp (any country code, default 92) |
 | BL-040 | research | P2 | M | Inbox | Real origin departure times for international arrivals from a flight-data service (AeroDataBox airport board), replacing BL-039's estimate where available |
+| BL-041 | feature | P2 | S | Testing | Search results: tapping anywhere on a flight card opens its details page; the "History" button is replaced by a `›` arrow (owner 2026-11-09: the button was not intuitive). Merged 2026-11-09 (PR #18); live check pending |
+| BL-042 | feature | P2 | S | Testing | Search kept in the address (`?date=&q=&type=&route=&city=`): Back from a flight, a reload or a shared link shows the same results, filters and place in the list. Merged 2026-11-09; live check pending |
 
 ### Task records
 
@@ -193,6 +196,12 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 - Free partial alternative already researched (project doc on airline sites): Airblue, PIA and Fly Jinnah status pages give both ends' scheduled times for their own international legs. Foreign carriers not covered.
 - Shape: small collector step (GitHub Action, key as a secret) writing one row per flight number + ISB arrival date with the origin's scheduled departure (local, with time zone), `data_source` registered in `source_priority`; the share link prefers it over the estimate.
 - Accept: for a day of ISB international arrivals, the stored origin dates match FlightStats for a sample of 10 flights including 3 overnight ones; units used per month recorded; terms re-checked against how the site is run (ads or not).
+
+**BL-041** *New 2026-11-09 (owner request).* Actual: a search result opened only through its small "History" button. Expected: tap the flight itself. Built in `docs/script.js` (each card is now an `<a href>` to the details page, same URL as before including `&type=`; `window.viewHistory` replaced by a local `detailUrl`, nothing else used it) and `docs/style.css` (link card without underline, visible keyboard focus, `›` arrow pinned to the right edge even when a logo fails; the phone rule that made the button full width removed). Being a real link, long-press / middle-click / open in new tab also work.
+- Checks (2026-11-09, stubbed browser): two cards render as links with no button; a click in the middle of the card text opens `flight_detail.html?flight=…&date=…&type=…`; HTML in city text stays text; arrow at the right edge with and without a logo; no sideways scroll at 320/375/768/1280 px. Live: tap a card on a phone; check the back button returns to the results.
+
+**BL-042** *New 2026-11-09 (follow-up to BL-041, owner approved).* Actual: results exist only after pressing Search, so Back from a flight could land on an empty search page when the browser had not kept the page in memory (and a reload lost the search). Expected: the same results, filters and scroll position. Built in `docs/script.js` only: after each search the address becomes `index.html?date=…&q=…&type=…&route=…&city=…` (`replaceState`, so no extra Back steps); on load, a valid `date` fills the form and re-runs the search; the city is applied during that search because its options only exist afterwards; the scroll position is kept per search in `sessionStorage` when a card is tapped and restored after the re-run. Bad values are ignored (date must be `YYYY-MM-DD`, type/route must be existing options, query normalised and capped at 12 characters); a plain visit is unchanged (no auto-search, clean address). Side effect: a search can be shared as a link; opening one adds it to Recent Searches like any search.
+- Checks (2026-11-09, stubbed browser over a local server, 30 flights): plain visit unchanged; type + city search writes the address; tapping the 7th card and pressing Back shows the same 10 results at the same scroll position; reload restores search, filters and scroll; a shared link with `q=pk-304` searches `PK304`; a bad date does nothing; a bad type is ignored and an HTML city value stays harmless; no sideways scroll at 320/768/1280 px. Live: on a phone, search, open a flight, press Back (also after switching apps for a minute); open a copied search link in another browser.
 - Blockers: owner signs up and picks a plan; confirm FIDS window limit and that `withLeg` gives scheduled (not only actual) departure times.
 
 **BL-028** *New 2026-11-01.* User need: visitors can reach the owner without the owner publishing an email address or phone number (D-014).
@@ -344,7 +353,11 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 
 ### 2026-11-09 | Claude | BL-039 wording and country code
 - Done: merged to main (d7fcbda), then reworded the departure-day block to plain dates and "leave" (owner found "night before" hard to follow) and made the WhatsApp country code editable. 28 stubbed-browser checks pass incl. country codes 92/971 and empty code. Pushed to main.
-- Next: owner checks on a phone; city query; renumber BL-039/040 if they clash with the other chat's PLAN.md.
+- Next: owner checks on a phone; city query. (No ID clash: the other chat continued at BL-041.)
+
+### 2026-11-09 (later) | Claude | BL-041 tap card to open, BL-042 search in the address
+- Done: whole search-result card is a link to the details page ("History" button replaced by a `›` arrow); the search is kept in the address and re-run on Back/reload/shared link, with the list's scroll position. Stubbed-browser checks pass. Both merged to `main` (owner's instruction).
+- Next: owner phone check on the live site.
 
 ### 2026-11-09 | Claude | BL-039 share box: departure day
 - Done: share box asks which day an arrival took off whenever there is doubt (Night before / Same day, guess preselected, Check links), else one line with Change; editable message; Copy, Share, WhatsApp. 20 date cases and interaction/width checks pass in a stubbed browser. Branch `fix/flightstats-departure-date`, not merged. BL-040 captured 2026-11-08 (AeroDataBox for later).

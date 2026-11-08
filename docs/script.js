@@ -25,6 +25,35 @@ document.addEventListener('DOMContentLoaded', () => {
   // Show history on page load
   renderHistory();
 
+  // A search kept in the address (BL-042): restored when someone comes back from a flight
+  // with Back, reloads the page, or opens a shared search link.
+  const SEARCH_KEYS = { q: 'flight-search', type: 'flight-type', route: 'nature-filter' };
+  const startParams = new URLSearchParams(window.location.search);
+  const startDate   = startParams.get('date');
+  let   restoreFromAddress = false;  // true until the restored search has run once
+  let   pendingCity = '';             // city options only exist after a search, so apply it during that one
+  if (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    dateInput.value = startDate;
+    for (const [key, id] of Object.entries(SEARCH_KEYS)) {
+      const el  = document.getElementById(id);
+      const val = startParams.get(key);
+      if (!el || !val) continue;
+      if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === val)) continue;
+      el.value = key === 'q' ? normaliseQuery(val).slice(0, 12) : val;
+    }
+    pendingCity = startParams.get('city') || '';
+    restoreFromAddress = true;
+  }
+
+  function saveSearchToAddress(params) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);
+    try { window.history.replaceState(null, '', `${window.location.pathname}?${qs}`); } catch (e) { /* ignore */ }
+  }
+
+  // Remember where the visitor was in the list, so coming back lands on the same flight
+  function scrollKey() { return 'resultsScroll:' + window.location.search; }
+
   // Floating back-to-top button — hidden until user scrolls down 300px
   const floatBtn = document.createElement('button');
   floatBtn.id = 'float-nav-btn';
@@ -78,12 +107,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Search ---
+  resultsDiv.addEventListener('click', (e) => {
+    if (!e.target.closest('a.flight-card')) return;
+    try { sessionStorage.setItem(scrollKey(), String(window.scrollY)); } catch (err) { /* ignore */ }
+  });
+
   searchBtn.addEventListener('click', async () => {
     const raw          = document.getElementById('flight-search').value.trim();
     const query        = raw ? normaliseQuery(raw) : '';
     const date         = dateInput.value;
     const typeFilter   = document.getElementById('flight-type').value;
-    const cityFilter   = citySelect.value;
+    const restoring    = restoreFromAddress;
+    const cityFilter   = restoring ? pendingCity : citySelect.value;
+    restoreFromAddress = false;
     const natureFilter = natureSelect ? natureSelect.value : '';
 
     if (!client) {
@@ -116,6 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (error) throw error;
 
+      saveSearchToAddress({ date, q: query, type: typeFilter, route: natureFilter, city: cityFilter });
+
       // Populate city filter above results and show it
       const cities = [...new Set(flights.map(f => f.city).filter(Boolean))].sort();
       citySelect.innerHTML = '<option value="">All Cities</option>' +
@@ -137,8 +175,10 @@ document.addEventListener('DOMContentLoaded', () => {
       // Render results
       resultsDiv.innerHTML = '';
       filtered.forEach(f => {
-        const card = document.createElement('div');
+        // The whole card is a link to the details page (BL-041): tap anywhere on the flight
+        const card = document.createElement('a');
         card.className = 'flight-card';
+        card.href      = detailUrl(f.flight_number, date, f.type);
 
         const img = document.createElement('img');
         img.src     = getLogoUrl(f.flight_number);
@@ -154,15 +194,23 @@ document.addEventListener('DOMContentLoaded', () => {
           <br>ST: ${esc(f.st ?? '—')} | ET: ${esc(f.et ?? '—')} | Status: ${esc(f.status ?? '—')}
         `;
 
-        const btn = document.createElement('button');
-        btn.textContent = 'History';
-        btn.addEventListener('click', () => viewHistory(f.flight_number, date, f.type));
+        const chevron = document.createElement('span');
+        chevron.className   = 'flight-card-chevron';
+        chevron.textContent = '›';
+        chevron.setAttribute('aria-hidden', 'true');
 
         card.appendChild(img);
         card.appendChild(info);
-        card.appendChild(btn);
+        card.appendChild(chevron);
         resultsDiv.appendChild(card);
       });
+
+      // Coming back from a flight: return to the same place in the list
+      if (restoring) {
+        let y = null;
+        try { y = sessionStorage.getItem(scrollKey()); } catch (e) { /* ignore */ }
+        if (y !== null) window.scrollTo(0, Number(y) || 0);
+      }
 
       // Save to history
       const label = query
@@ -345,10 +393,13 @@ document.addEventListener('DOMContentLoaded', () => {
     searchBtn.click();
   };
 
-  window.viewHistory = function(flightNumber, date, type) {
+  function detailUrl(flightNumber, date, type) {
     // type keeps an arrival and a departure with the same number apart (BL-022)
     const typePart = type ? `&type=${encodeURIComponent(type)}` : '';
-    window.location.href = `flight_detail.html?flight=${encodeURIComponent(flightNumber)}&date=${encodeURIComponent(date)}${typePart}`;
-  };
+    return `flight_detail.html?flight=${encodeURIComponent(flightNumber)}&date=${encodeURIComponent(date)}${typePart}`;
+  }
+
+  // Run the search kept in the address (set up near the top of this file)
+  if (restoreFromAddress) searchBtn.click();
 
 });
