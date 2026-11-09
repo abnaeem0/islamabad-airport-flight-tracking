@@ -79,7 +79,7 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-048**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-049**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -135,6 +135,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-045 | chore | P1 | M | Blocked | Retire the old Islamabad collector: stop dispatching `scrape.yml`, then remove `scraper.py`, its workflow and the site's fallback reads; export, then drop `flights`, `flight_snapshots`, `scraper_status`. Blocked on BL-032 live checks |
 | BL-046 | chore | P3 | S | Ready | Drop the unused `flight_canonical_view` and `notes/REFERENCE_QUERIES.txt` (which only documents it); BL-019 is cancelled with it |
 | BL-047 | feature | P2 | S | Doing | Add South Air (IATA Z8, ICAO SQB): helpline added 2026-11-09; FlightStats has no South Air data (owner checked Z8 and SQB), so no FlightStats link; logo still open. Its code Z8 previously belonged to Amaszonas (Bolivia), so generic logo and tracker sites may show the wrong airline |
+| BL-048 | feature | P2 | M | Proposed | Search page: one box for flight, airline or city with suggestions; the day's list loads at once and narrows as you type; day arrows; Arrivals/Departures and route as full-width toggles; cards with 48 px logo, airline name and coloured status; Recent saves opened flights and settled searches |
 
 ### Task records
 
@@ -183,6 +184,16 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 **BL-046** No page reads `flight_canonical_view` (checked in the repo 2026-11-06). Before dropping, check nothing in the database depends on it and save its definition privately (`SELECT pg_get_viewdef('public.flight_canonical_view', true);`). Rollback: re-create from that saved definition.
 
 **BL-047** South Air: began operations November 2025 (inaugurated in Multan), scheduled domestic flights from Karachi since 16 Jul 2026 with ATR 72s; Karachi, Islamabad, Bahawalpur, Sukkur, Gwadar, Rahim Yar Khan and others. PAA already lists it as `Z8` (e.g. `Z8921` in BL-010A, `Z8922` Islamabad-Multan on 2026-11-08); booking sites and trackers show `SQB`. No public flight-status page (website `southair.com.pk`, booking engine `z8.ibe.ejmiral.com`, no manage-booking link). 2026-11-09: owner chose the call-centre number for the share text (`051 111 222 999`, from the website footer); added to `AIRLINE_INFO`. Owner checked FlightStats the same day: South Air is not found under `Z8` or `SQB`, so its share text has no FlightStats line and no departure-day question, only the phone number. Still open: logo (`docs/logos/z8.png` and `LOCAL_AIRLINES` in `script.js`).
+
+
+**BL-048** *New 2026-11-09 (owner: find flights by airline name; logos unreadable on phones; dropdowns take too much space).* Owner chose one search box over a separate airline dropdown, and card option C (logo plus airline name) from chat mockups; asked for the Arrivals/Departures toggle not to be cramped. Built in `docs/index.html`, `docs/script.js`, `docs/style.css`, new shared `docs/airlines.js` (airline names, aliases, FlightStats codes; also used by `flight_detail.js`):
+- The day's flights load once (`isb_flights_view`, fallback `flights`) as soon as the page opens; the box, the toggles and the day arrows only filter that list, with no Search button. The box matches flight number (`PK301`, `301`, `pk 301`), airline code, name or alias (`PIA`, `Emirates`, `airblue`, `AZAL`) and city. Suggestions under the box list matching airlines and cities in the day's list with counts.
+- Controls: search box; day pill with ‹ › and the native date picker; Arrivals/Departures and All routes/International/Domestic as full-width toggles (side by side above 700 px). City dropdown, Search button and hint line removed. A line shows "N flights · updated X ago" (collector's last run) and the Recent link.
+- Cards: 48 px logo on white (local logos now load from the relative `logos/` path, foreign from `pics.avs.io` at 96 px; a failed logo shows the airline code), airline name, flight, type and city, route badge, times and a coloured status label (words always shown).
+- Recent: saves a flight when it is opened (flight number, day, direction) and a search once it has been left alone for 4 seconds (text and toggles), never the plain day list. Custom names kept; up to 10; older saved entries (before this change) still show and open.
+- Address keeps `date`, `q`, `type`, `route` as before (BL-042); old links with `city=` put the city in the box. Back returns to the same place in the list.
+- Checks (stubbed browser, 2026-11-09): 40 search-page checks (matching for 11 queries, suggestions, toggles, address, day arrows, empty day, no-match, HTML in city/status, failed logo, view fallback, old and new Recent entries, settled-search saving, opened-flight saving, Back position, 320-1280 px without sideways scroll and with toggle labels fitting); details-page share checks (28) and airline-link checks (44) rerun after moving the airline list. Not yet seen on a real phone or with live data.
+
 
 **BL-017** Confirmed by the private owner-supplied report: excess public write privileges and missing protection on one status table. Need an explicit relation/role plan, a view security review, and preserved collector access. Accept: public reads work, unnecessary public writes denied, collector writes preserved, inherited privileges considered, safe non-destructive verification. **Keep the evidence and the SQL private** (not in this repo, not in public chats). Owner's read-only check on 2026-11-02 shows the issue is still present.
 
@@ -377,6 +388,10 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 **Done 2026-11-04.** Kept for reference. After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-09 | Claude | BL-048 one-box search
+- Done: search page rebuilt as one box (flight, airline or city) with suggestions, day arrows, full-width toggles, airline-name cards with 48 px logos and coloured status; Recent saves opened flights and settled searches. Airline list moved to shared `airlines.js`. Closed PR #13 (logos not taken). 40 + 28 + 44 stubbed-browser checks pass. Branch `fix/flightstats-departure-date`, not merged yet.
+- Next: owner looks at the screenshots, then merge; live check on a phone.
 
 ### 2026-11-09 | Claude | BL-043/047 owner link checks
 - Done: owner checked FlightStats: flyadeal fine; South Air not found (Z8, SQB) so its FlightStats link is removed and only the call-centre number stays; Riyadh Air RX659 not flying (temporary Gassim operation, RX9661/9662). Merged PR #16's plan with IDs renumbered to BL-044..047 and closed it.

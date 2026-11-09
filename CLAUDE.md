@@ -14,7 +14,7 @@ For domestic flights landing in Islamabad, the details page also shows what the 
 
 | Layer | What | Where |
 |---|---|---|
-| Website | Static vanilla JS/CSS, no build step. Pages live in `docs/` (GitHub Pages). The contact page posts to a form service (Web3Forms, key placeholder in `contact.html` until set) | `docs/index.html`, `script.js`, `flight_detail.html`, `flight_detail.js`, `about.html`, `contact.html`, `style.css`, `sitemap.xml`, `logos/` |
+| Website | Static vanilla JS/CSS, no build step. Pages live in `docs/` (GitHub Pages). The contact page posts to a form service (Web3Forms, key placeholder in `contact.html` until set) | `docs/index.html`, `script.js`, `airlines.js` (shared airline names and FlightStats codes), `flight_detail.html`, `flight_detail.js`, `about.html`, `contact.html`, `style.css`, `sitemap.xml`, `logos/` |
 | Database | Supabase Postgres, free plan (23 MB on 2026-09-30). Browser reads directly with a publishable key | tables in section 4 |
 | Original collector | Islamabad only; yesterday, today, tomorrow; keeps 2 months | `scraper.py` -> `flights`, `flight_snapshots`, `scraper_status` |
 | New collector | 6 airports (Islamabad, Karachi, Lahore, Faisalabad, Multan, Peshawar); today and tomorrow; keeps 7 days; concurrent fetch, serial writes | `origin_scraper.py` -> `origin_flights`, `origin_snapshots`, `origin_scraper_status` |
