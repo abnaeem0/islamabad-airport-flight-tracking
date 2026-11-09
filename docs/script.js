@@ -29,20 +29,22 @@ document.addEventListener('DOMContentLoaded', () => {
   let loadedFor = null;    // date dayRows belongs to
   let loadToken = 0;       // ignores answers to an older day's request
   let lastRun   = null;    // collector's last run (freshness line)
-  let scrollToNow = false; // today's list opens at the current time (set on page load and on returning to today)
 
   // A search kept in the address (BL-042): restored on Back, reload, or a shared search link.
-  // Old links may carry city= (the city filter was folded into the box) and uppercase q.
+  // Today's date is left out of the address, so a reload tomorrow opens the new today; any other
+  // day stays pinned. Old links may carry city= (the city filter was folded into the box).
   const startParams = new URLSearchParams(window.location.search);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(startParams.get('date') || '')) state.date = startParams.get('date');
+  state.q     = (startParams.get('q') || startParams.get('city') || '').slice(0, 40);
+  state.type  = ['Arrival', 'Departure'].includes(startParams.get('type')) ? startParams.get('type') : '';
+  state.route = ['International', 'Domestic'].includes(startParams.get('route')) ? startParams.get('route') : '';
+
+  // Back, Forward or reload: return to the same place in the list (not on a fresh visit)
   let restoreScroll = false;
-  scrollToNow = true;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(startParams.get('date') || '')) {
-    state.date  = startParams.get('date');
-    state.q     = (startParams.get('q') || startParams.get('city') || '').slice(0, 40);
-    state.type  = ['Arrival', 'Departure'].includes(startParams.get('type')) ? startParams.get('type') : '';
-    state.route = ['International', 'Domestic'].includes(startParams.get('route')) ? startParams.get('route') : '';
-    restoreScroll = true;
-  }
+  try {
+    const nav = performance.getEntriesByType('navigation')[0];
+    restoreScroll = !!nav && (nav.type === 'back_forward' || nav.type === 'reload');
+  } catch (e) { /* older browsers: start at the top */ }
 
   // ===== UTILS =====
   function todayPKT() {
@@ -150,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function changeDate(iso) {
     state.date = iso;
-    scrollToNow = true;
     syncControls();
     loadDay();
     scheduleSave();
@@ -222,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     resultsDiv.innerHTML = '<p>Loading…</p>';
     metaEl.textContent = '';
+    updateNowBtn();
     try {
       // Reads the origin-based view; if it is missing or errors, falls back to the original table
       const run = table => client.from(table).select('*').eq('scheduled_date', date);
@@ -242,8 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       // instant: the page's smooth scrolling would otherwise animate from the top
       if (y !== null) window.scrollTo({ top: Number(y) || 0, behavior: 'instant' });
-      else if (scrollToNow) goToNow();
-      scrollToNow = false;
+      updateNowBtn();
     } catch (err) {
       if (token !== loadToken) return;
       console.error(err);
@@ -318,18 +319,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isToday && !nowPlaced) frag.appendChild(nowLine());   // every flight is earlier than now
     resultsDiv.innerHTML = '';
     resultsDiv.appendChild(frag);
+    updateNowBtn();
   }
 
-  // Scroll today's list so the "Now" line is near the top, with the last flight or two above it.
-  // Only for the plain list (no text in the box); skipped when the line is already near the top.
+  // "Now" button (today only): scrolls so the Now line is near the top, with about one earlier
+  // flight above it. The page itself always opens at the top, so the search area is seen first.
   function goToNow() {
     const line = document.getElementById('now-line');
-    if (!line || state.q || state.date !== todayPKT()) return;
-    if (!line.previousElementSibling) return;            // nothing earlier: leave the page at the top
+    if (!line) return;
     const header = document.querySelector('.site-header');
-    const top = line.getBoundingClientRect().top + window.scrollY
-              - (header ? header.offsetHeight : 0) - 150;  // room for about one earlier flight
-    if (top > window.scrollY) window.scrollTo({ top, behavior: 'instant' });
+    const room = line.previousElementSibling ? 150 : 16;
+    const top = Math.max(0, line.getBoundingClientRect().top + window.scrollY
+              - (header ? header.offsetHeight : 0) - room);
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top, behavior: reduce ? 'instant' : 'smooth' });
   }
 
   // Card (BL-048, option C): 48 px logo, the airline's name in words, then flight, times, status
@@ -382,11 +385,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function saveSearchToAddress() {
     const qs = new URLSearchParams();
-    qs.set('date', state.date);
+    if (state.date !== todayPKT()) qs.set('date', state.date);
     if (state.q)     qs.set('q', state.q);
     if (state.type)  qs.set('type', state.type);
     if (state.route) qs.set('route', state.route);
-    try { window.history.replaceState(null, '', `${window.location.pathname}?${qs}`); } catch (e) { /* ignore */ }
+    const query = qs.toString();
+    try { window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : '')); } catch (e) { /* ignore */ }
   }
 
   // Remember where the visitor was in the list, so coming back lands on the same flight
@@ -599,6 +603,28 @@ document.addEventListener('DOMContentLoaded', () => {
   document.body.appendChild(floatBtn);
   window.addEventListener('scroll', () => floatBtn.classList.toggle('visible', window.scrollY > 300));
   floatBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+  // ===== NOW BUTTON (today only, while the Now line is off-screen) =====
+  const nowBtn = document.createElement('button');
+  nowBtn.id   = 'now-btn';
+  nowBtn.type = 'button';
+  document.body.appendChild(nowBtn);
+  nowBtn.addEventListener('click', goToNow);
+
+  function updateNowBtn() {
+    const line = document.getElementById('now-line');
+    if (!line) { nowBtn.classList.remove('visible'); return; }
+    const r = line.getBoundingClientRect();
+    const header = document.querySelector('.site-header');
+    const below  = r.top >= window.innerHeight - 60;            // under the screen (or behind the buttons)
+    const above  = r.bottom <= (header ? header.offsetHeight : 0);
+    nowBtn.textContent = below ? 'Now ↓' : 'Now ↑';
+    nowBtn.setAttribute('aria-label', `Go to the current time (${below ? 'down' : 'up'} the list)`);
+    nowBtn.classList.toggle('visible', below || above);
+    nowBtn.classList.toggle('stacked', window.scrollY > 300);   // sits above "↑ Top" when that shows
+  }
+  window.addEventListener('scroll', updateNowBtn, { passive: true });
+  window.addEventListener('resize', updateNowBtn);
 
   // ===== START =====
   syncControls();
