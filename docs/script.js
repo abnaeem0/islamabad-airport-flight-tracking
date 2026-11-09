@@ -29,11 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let loadedFor = null;    // date dayRows belongs to
   let loadToken = 0;       // ignores answers to an older day's request
   let lastRun   = null;    // collector's last run (freshness line)
+  let scrollToNow = false; // today's list opens at the current time (set on page load and on returning to today)
 
   // A search kept in the address (BL-042): restored on Back, reload, or a shared search link.
   // Old links may carry city= (the city filter was folded into the box) and uppercase q.
   const startParams = new URLSearchParams(window.location.search);
   let restoreScroll = false;
+  scrollToNow = true;
   if (/^\d{4}-\d{2}-\d{2}$/.test(startParams.get('date') || '')) {
     state.date  = startParams.get('date');
     state.q     = (startParams.get('q') || startParams.get('city') || '').slice(0, 40);
@@ -66,6 +68,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (iso === shiftDate(t, -1)) return `Yesterday · ${dayName(iso)}`;
     if (iso === shiftDate(t, 1)) return `Tomorrow · ${dayName(iso)}`;
     return dayName(iso);
+  }
+
+  function nowMinutesPKT() {
+    const [h, m] = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Karachi', hour12: false })
+      .split(':').map(Number);
+    return (h % 24) * 60 + m;
   }
 
   function timeToMinutes(t) {
@@ -142,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function changeDate(iso) {
     state.date = iso;
+    scrollToNow = true;
     syncControls();
     loadDay();
     scheduleSave();
@@ -226,13 +235,15 @@ document.addEventListener('DOMContentLoaded', () => {
       dayRows   = Array.isArray(data) ? data : [];
       loadedFor = date;
       render();
+      let y = null;
       if (restoreScroll) {                  // coming back from a flight: same place in the list
         restoreScroll = false;
-        let y = null;
         try { y = sessionStorage.getItem(scrollKey()); } catch (e) { /* ignore */ }
-        // instant: the page's smooth scrolling would otherwise animate from the top
-        if (y !== null) window.scrollTo({ top: Number(y) || 0, behavior: 'instant' });
       }
+      // instant: the page's smooth scrolling would otherwise animate from the top
+      if (y !== null) window.scrollTo({ top: Number(y) || 0, behavior: 'instant' });
+      else if (scrollToNow) goToNow();
+      scrollToNow = false;
     } catch (err) {
       if (token !== loadToken) return;
       console.error(err);
@@ -287,10 +298,38 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Today: a "Now" line before the first flight scheduled at or after the current time
+    const isToday = state.date === todayPKT();
+    const nowMin  = isToday ? nowMinutesPKT() : null;
+    let nowPlaced = false;
+    const nowLine = () => {
+      const d = document.createElement('div');
+      d.className = 'now-line';
+      d.id = 'now-line';
+      d.innerHTML = `<span>Now · ${String(Math.floor(nowMin / 60)).padStart(2, '0')}:${String(nowMin % 60).padStart(2, '0')}</span>`;
+      return d;
+    };
+
     const frag = document.createDocumentFragment();
-    shown.forEach(f => frag.appendChild(flightCard(f)));
+    shown.forEach(f => {
+      if (isToday && !nowPlaced && timeToMinutes(f.st) >= nowMin) { frag.appendChild(nowLine()); nowPlaced = true; }
+      frag.appendChild(flightCard(f));
+    });
+    if (isToday && !nowPlaced) frag.appendChild(nowLine());   // every flight is earlier than now
     resultsDiv.innerHTML = '';
     resultsDiv.appendChild(frag);
+  }
+
+  // Scroll today's list so the "Now" line is near the top, with the last flight or two above it.
+  // Only for the plain list (no text in the box); skipped when the line is already near the top.
+  function goToNow() {
+    const line = document.getElementById('now-line');
+    if (!line || state.q || state.date !== todayPKT()) return;
+    if (!line.previousElementSibling) return;            // nothing earlier: leave the page at the top
+    const header = document.querySelector('.site-header');
+    const top = line.getBoundingClientRect().top + window.scrollY
+              - (header ? header.offsetHeight : 0) - 150;  // room for about one earlier flight
+    if (top > window.scrollY) window.scrollTo({ top, behavior: 'instant' });
   }
 
   // Card (BL-048, option C): 48 px logo, the airline's name in words, then flight, times, status
@@ -323,8 +362,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="fc-route">${esc(f.type ?? '')} · ${esc(f.city ?? '—')}</span>
         ${f.nature ? `<span class="flight-nature ${esc(String(f.nature).toLowerCase())}">${esc(f.nature)}</span>` : ''}
       </div>
-      <div class="fc-times">ST ${esc(f.st ?? '—')} · ET ${esc(f.et ?? '—')} ·
-        <span class="status-pill ${statusClass(f.status)}">${esc(f.status ?? '—')}</span></div>`;
+      <div class="fc-times">ST ${esc(f.st || '—')} · ET ${esc(f.et || '—')} ·
+        <span class="status-pill ${statusClass(f.status)}">${esc(f.status || '—')}</span></div>`;
 
     const chevron = document.createElement('span');
     chevron.className   = 'flight-card-chevron';

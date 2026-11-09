@@ -135,7 +135,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-045 | chore | P1 | M | Blocked | Retire the old Islamabad collector: stop dispatching `scrape.yml`, then remove `scraper.py`, its workflow and the site's fallback reads; export, then drop `flights`, `flight_snapshots`, `scraper_status`. Blocked on BL-032 live checks |
 | BL-046 | chore | P3 | S | Ready | Drop the unused `flight_canonical_view` and `notes/REFERENCE_QUERIES.txt` (which only documents it); BL-019 is cancelled with it |
 | BL-047 | feature | P2 | S | Doing | Add South Air (IATA Z8, ICAO SQB): helpline added 2026-11-09; FlightStats has no South Air data (owner checked Z8 and SQB), so no FlightStats link; logo still open. Its code Z8 previously belonged to Amaszonas (Bolivia), so generic logo and tracker sites may show the wrong airline |
-| BL-048 | feature | P2 | M | Proposed | Search page: one box for flight, airline or city with suggestions; the day's list loads at once and narrows as you type; day arrows; Arrivals/Departures and route as full-width toggles; cards with 48 px logo, airline name and coloured status; Recent saves opened flights and settled searches |
+| BL-048 | feature | P2 | M | Testing | Search page: one box for flight, airline or city with suggestions; the day's list loads at once and narrows as you type; day arrows; Arrivals/Departures and route as full-width toggles; cards with 48 px logo, airline name and coloured status; Recent saves opened flights and settled searches |
 
 ### Task records
 
@@ -191,8 +191,9 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 - Controls: search box; day pill with ‹ › and the native date picker; Arrivals/Departures and All routes/International/Domestic as full-width toggles (side by side above 700 px). City dropdown, Search button and hint line removed. A line shows "N flights · updated X ago" (collector's last run) and the Recent link.
 - Cards: 48 px logo on white (local logos now load from the relative `logos/` path, foreign from `pics.avs.io` at 96 px; a failed logo shows the airline code), airline name, flight, type and city, route badge, times and a coloured status label (words always shown).
 - Recent: saves a flight when it is opened (flight number, day, direction) and a search once it has been left alone for 4 seconds (text and toggles), never the plain day list. Custom names kept; up to 10; older saved entries (before this change) still show and open.
+- Today's list shows a "Now · HH:MM" line before the first flight scheduled at or after the current time (PKT) and opens scrolled to it with about one earlier flight above; only for today and only with an empty box; not when typing, and not when Back restores a saved position (owner request 2026-11-09).
 - Address keeps `date`, `q`, `type`, `route` as before (BL-042); old links with `city=` put the city in the box. Back returns to the same place in the list.
-- Checks (stubbed browser, 2026-11-09): 40 search-page checks (matching for 11 queries, suggestions, toggles, address, day arrows, empty day, no-match, HTML in city/status, failed logo, view fallback, old and new Recent entries, settled-search saving, opened-flight saving, Back position, 320-1280 px without sideways scroll and with toggle labels fitting); details-page share checks (28) and airline-link checks (44) rerun after moving the airline list. Not yet seen on a real phone or with live data.
+- Checks (stubbed browser, 2026-11-09): 10 frozen-clock checks for the Now line (midday, after midnight, late evening, other day, box filled, day arrows, typing) and 40 search-page checks (matching for 11 queries, suggestions, toggles, address, day arrows, empty day, no-match, HTML in city/status, failed logo, view fallback, old and new Recent entries, settled-search saving, opened-flight saving, Back position, 320-1280 px without sideways scroll and with toggle labels fitting); details-page share checks (28) and airline-link checks (44) rerun after moving the airline list. Not yet seen on a real phone or with live data.
 
 
 **BL-017** Confirmed by the private owner-supplied report: excess public write privileges and missing protection on one status table. Need an explicit relation/role plan, a view security review, and preserved collector access. Accept: public reads work, unnecessary public writes denied, collector writes preserved, inherited privileges considered, safe non-destructive verification. **Keep the evidence and the SQL private** (not in this repo, not in public chats). Owner's read-only check on 2026-11-02 shows the issue is still present.
@@ -390,8 +391,8 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 ## 7. Journal (newest first)
 
 ### 2026-11-09 | Claude | BL-048 one-box search
-- Done: search page rebuilt as one box (flight, airline or city) with suggestions, day arrows, full-width toggles, airline-name cards with 48 px logos and coloured status; Recent saves opened flights and settled searches. Airline list moved to shared `airlines.js`. Closed PR #13 (logos not taken). 40 + 28 + 44 stubbed-browser checks pass. Branch `fix/flightstats-departure-date`, not merged yet.
-- Next: owner looks at the screenshots, then merge; live check on a phone.
+- Done: search page rebuilt as one box (flight, airline or city) with suggestions, day arrows, full-width toggles, airline-name cards with 48 px logos and coloured status; Recent saves opened flights and settled searches; today's list opens at a "Now" line. Owner approved from screenshots; merged to main. Airline list moved to shared `airlines.js`. Closed PR #13 (logos not taken). 40 + 28 + 44 stubbed-browser checks pass. 
+- Next: live check on a phone; owner may want a fuller layout on large screens later.
 
 ### 2026-11-09 | Claude | BL-043/047 owner link checks
 - Done: owner checked FlightStats: flyadeal fine; South Air not found (Z8, SQB) so its FlightStats link is removed and only the call-centre number stays; Riyadh Air RX659 not flying (temporary Gassim operation, RX9661/9662). Merged PR #16's plan with IDs renumbered to BL-044..047 and closed it.

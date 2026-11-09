@@ -498,6 +498,25 @@ a.flight-card:focus-visible {
   transform: translateX(3px);
 }
 
+/* "Now" divider in today's list (BL-048) */
+.now-line {
+  display:     flex;
+  align-items: center;
+  gap:         0.6rem;
+  margin:      0.2rem 0 0.8rem;
+  color:       var(--accent-2);
+  font-size:   0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.now-line::before, .now-line::after {
+  content:    '';
+  flex:       1;
+  height:     1px;
+  background: var(--accent-2);
+  opacity:    0.5;
+}
+
 /* =========================
    History Section
 ========================= */
