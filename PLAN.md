@@ -78,7 +78,7 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-043**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-044**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -129,6 +129,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-040 | research | P2 | M | Inbox | Real origin departure times for international arrivals from a flight-data service (AeroDataBox airport board), replacing BL-039's estimate where available |
 | BL-041 | feature | P2 | S | Testing | Search results: tapping anywhere on a flight card opens its details page; the "History" button is replaced by a `›` arrow (owner 2026-11-09: the button was not intuitive). Merged 2026-11-09 (PR #18); live check pending |
 | BL-042 | feature | P2 | S | Testing | Search kept in the address (`?date=&q=&type=&route=&city=`): Back from a flight, a reload or a shared link shows the same results, filters and place in the list. Merged 2026-11-09; live check pending |
+| BL-043 | bug | P1 | S | Testing | FlightStats share link broke for airline codes with a digit (J2143 became J/2143) and for airlines FlightStats files under another code. Ported the checked code table from branch `airline-links-logos` |
 
 ### Task records
 
@@ -199,6 +200,10 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 
 **BL-041** *New 2026-11-09 (owner request).* Actual: a search result opened only through its small "History" button. Expected: tap the flight itself. Built in `docs/script.js` (each card is now an `<a href>` to the details page, same URL as before including `&type=`; `window.viewHistory` replaced by a local `detailUrl`, nothing else used it) and `docs/style.css` (link card without underline, visible keyboard focus, `›` arrow pinned to the right edge even when a logo fails; the phone rule that made the button full width removed). Being a real link, long-press / middle-click / open in new tab also work.
 - Checks (2026-11-09, stubbed browser): two cards render as links with no button; a click in the middle of the card text opens `flight_detail.html?flight=…&date=…&type=…`; HTML in city text stays text; arrow at the right edge with and without a logo; no sideways scroll at 320/375/768/1280 px. Live: tap a card on a phone; check the back button returns to the results.
+
+**BL-043** *New 2026-11-09 (owner report: J2143 opened "Flight Status Not Available" on FlightStats).* Actual: the share box knew only PK, PA, 9P and PF; for any other airline it took the letters as the code and the rest as the number, so Azerbaijan Airlines J2143 became `J/2143` (also broke G9, F3, J9, 3L, W5, B9, Z8, and airlines FlightStats files under an ICAO code such as flyadeal FAD and SalamAir OMS). Fix in `docs/flight_detail.js`: `AIRLINE_INFO` replaced by the 35-airline table from unmerged branch `airline-links-logos` (commit 0a09a74, FlightStats codes checked against live tracker URLs on 2026-11-04 by that chat, not re-checked here); `splitFlightNumber` always takes the first two characters as the IATA code; an airline missing from the table falls back to its IATA code; a number that is not an airline flight (registration such as APESL) gets no FlightStats line and no departure-day question. AirSial keeps its manage-reservation page (owner, 2026-11-08). The header now names foreign airlines too. Rest of that branch (logos, search-page changes) is still unmerged.
+- Checks (stubbed browser, 2026-11-09): every table airline builds `/<fsCode>/123`, plus J2143 -> `/J2/143`, 9P734 -> `/FJL/734`, PK0301 -> `/PK/301`, PK301A -> `/PK/301`, unknown ZZ123 -> `/ZZ/123`, APESL and 12345 -> no link; 42 pass. BL-039 share-box checks rerun: 28 pass.
+- Still unverified: South Air (Z8) is not in the table, and FlightStats may file Z8 under the old Amaszonas airline; Riyadh Air (RX) not in the table. Live: open a share link for J2143 and one foreign airline from the board.
 
 **BL-042** *New 2026-11-09 (follow-up to BL-041, owner approved).* Actual: results exist only after pressing Search, so Back from a flight could land on an empty search page when the browser had not kept the page in memory (and a reload lost the search). Expected: the same results, filters and scroll position. Built in `docs/script.js` only: after each search the address becomes `index.html?date=…&q=…&type=…&route=…&city=…` (`replaceState`, so no extra Back steps); on load, a valid `date` fills the form and re-runs the search; the city is applied during that search because its options only exist afterwards; the scroll position is kept per search in `sessionStorage` when a card is tapped and restored after the re-run. Bad values are ignored (date must be `YYYY-MM-DD`, type/route must be existing options, query normalised and capped at 12 characters); a plain visit is unchanged (no auto-search, clean address). Side effect: a search can be shared as a link; opening one adds it to Recent Searches like any search.
 - Checks (2026-11-09, stubbed browser over a local server, 30 flights): plain visit unchanged; type + city search writes the address; tapping the 7th card and pressing Back shows the same 10 results at the same scroll position; reload restores search, filters and scroll; a shared link with `q=pk-304` searches `PK304`; a bad date does nothing; a bad type is ignored and an HTML city value stays harmless; no sideways scroll at 320/768/1280 px. Live: on a phone, search, open a flight, press Back (also after switching apps for a minute); open a copied search link in another browser.
@@ -350,6 +355,10 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 **Done 2026-11-04.** Kept for reference. After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
 
 ## 7. Journal (newest first)
+
+### 2026-11-09 | Claude | BL-043 FlightStats airline codes
+- Done: share link uses the 35-airline FlightStats code table from branch `airline-links-logos` and splits codes like J2/9P/3L correctly; registrations get no link. 42 link cases + 28 share-box checks pass in a stubbed browser. Pushed to main.
+- Next: owner opens J2143's share link live; check South Air (Z8) on FlightStats.
 
 ### 2026-11-09 | Claude | BL-039 wording and country code
 - Done: merged to main (d7fcbda), then reworded the departure-day block to plain dates and "leave" (owner found "night before" hard to follow) and made the WhatsApp country code editable. 28 stubbed-browser checks pass incl. country codes 92/971 and empty code. Pushed to main.
