@@ -48,6 +48,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             statusUrl: 'https://www.airsial.com/manage-reservation',
             contact: '021-38732063' },
     ER:   { name: 'SereneAir',         fsCode: 'SEP' },
+    // South Air: no status page; call centre from southair.com.pk (2026-11-09). FlightStats code
+    // Z8 not yet checked (Z8 was Amaszonas before; trackers list South Air as SQB). BL-047.
+    Z8:   { name: 'South Air',         fsCode: 'Z8', contact: '051-111-222-999' },
     // Foreign airlines that serve Islamabad
     EK:   { name: 'Emirates',          fsCode: 'EK', statusUrl: 'https://www.emirates.com/flightstatus' },
     EY:   { name: 'Etihad',            fsCode: 'EY', statusUrl: 'https://www.etihad.com/en/manage/flight-status' },
@@ -56,6 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     G9:   { name: 'Air Arabia',        fsCode: 'G9' },
     '3L': { name: 'Air Arabia Abu Dhabi', fsCode: '3L*' },
     SV:   { name: 'Saudia',            fsCode: 'SV' },
+    RX:   { name: 'Riyadh Air',        fsCode: 'RX' },   // added 2026-11-09; FlightStats code not yet checked
     XY:   { name: 'flynas',            fsCode: 'XY' },
     F3:   { name: 'flyadeal',          fsCode: 'FAD' },
     GF:   { name: 'Gulf Air',          fsCode: 'GF' },

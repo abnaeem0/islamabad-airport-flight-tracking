@@ -1,7 +1,7 @@
 # PLAN.md: Islamabad Flight Tracker
 
 Spec, decisions, backlog, journal and the current handoff, in one place. Stable rules and architecture are in `CLAUDE.md`.
-This merges the repo's earlier doc set (`AGENTS.md`, `docs/SPEC|BACKLOG|DECISIONS|JOURNAL|DB|WORKFLOW.md`, dated 2026-09-30) and keeps its task IDs. Last updated: 2026-11-01.
+This merges the repo's earlier doc set (`AGENTS.md`, `docs/SPEC|BACKLOG|DECISIONS|JOURNAL|DB|WORKFLOW.md`, dated 2026-09-30) and keeps its task IDs. Last updated: 2026-11-09.
 Public repo: no email, phone, credentials or security details in this file.
 
 ## 1. Current handoff
@@ -28,6 +28,7 @@ Public repo: no email, phone, credentials or security details in this file.
 - **BL-032 switch (merged 2026-11-04, owner away, by the owner's instruction):** search, history and details read `isb_flights_view` / `isb_snapshots_view` and **fall back to the old tables** if a view errors, so the site works even if the view SQL was not applied. Rollback: revert the merge commit (the old tables and collector were never touched). Turn off the old Islamabad collector only after several days of side-by-side checks. Checked in a stubbed browser with views present and missing; not checked on the live site.
 - **Merged 2026-11-04 (late), by the owner's instruction:** BL-036 details-page journey card (PR #11) (needs no SQL; reads `origin_snapshots` for the "first seen departed" line and hides it if that read fails).
 - **BL-038 live 2026-11-06:** Islamabad-first details page with the one-line departure notice and the "Airport board" history switch. Owner checks a few domestic arrivals (one where Lahore/Karachi is late, one departed) and an international one (no switch).
+- **Simplicity review 2026-11-06 (Claude, code reading only; merged 2026-11-09 from PR #16 with IDs renumbered):** the biggest duplication is two collectors writing two sets of Islamabad tables plus fallback reads in the site (BL-045); `flight_canonical_view` is unused (BL-046); logos are already simple (BL-016); the share text's FlightStats link broke for airline codes with a digit (fixed as BL-043); South Air needs adding (BL-047); Serene Air is not in the code and is still grounded. A monthly owner check is BL-044.
 - **Suggested next sequence:** BL-017 (private evidence) -> switch on the contact form (BL-028 key) -> BL-002 -> BL-010A (validate origin data) -> BL-021 / BL-022 -> BL-010B/C. A newly observed outage goes first.
 
 ## 2. Spec
@@ -78,7 +79,7 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-044**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-048**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -113,7 +114,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-016 | chore | P3 | M | Inbox | README, sitemap, logo housekeeping |
 | BL-017 | chore | P1 | M | Ready | Restrict public database privileges (evidence kept private) |
 | BL-018 | research | P2 | M | Inbox | Evaluate Islamabad relevance filter safely |
-| BL-019 | bug | P1 | M | Inbox | Overnight and duplicate canonical matching |
+| BL-019 | bug | P1 | M | Cancelled | Overnight and duplicate canonical matching. Cancelled 2026-11-06: the view it fixes is unused (BL-046); the site's pairing view `isb_arrival_origin_view` already handles overnight legs |
 | BL-020 | research | P2 | S | Inbox | Measure retention and storage before extending |
 | BL-021 | bug | P1 | M | Ready | Report honest freshness and batch outcomes |
 | BL-022 | bug | P1 | M | Testing | Keep direction in flight history identity |
@@ -130,6 +131,10 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-041 | feature | P2 | S | Testing | Search results: tapping anywhere on a flight card opens its details page; the "History" button is replaced by a `›` arrow (owner 2026-11-09: the button was not intuitive). Merged 2026-11-09 (PR #18); live check pending |
 | BL-042 | feature | P2 | S | Testing | Search kept in the address (`?date=&q=&type=&route=&city=`): Back from a flight, a reload or a shared link shows the same results, filters and place in the list. Merged 2026-11-09; live check pending |
 | BL-043 | bug | P1 | S | Testing | FlightStats share link broke for airline codes with a digit (J2143 became J/2143) and for airlines FlightStats files under another code. Ported the checked code table from branch `airline-links-logos` |
+| BL-044 | chore | P2 | S | Ready | Monthly 10-minute owner check that the site's flows and outside links still work (checklist in task records); reminder lives on the owner's phone, not in the app |
+| BL-045 | chore | P1 | M | Blocked | Retire the old Islamabad collector: stop dispatching `scrape.yml`, then remove `scraper.py`, its workflow and the site's fallback reads; export, then drop `flights`, `flight_snapshots`, `scraper_status`. Blocked on BL-032 live checks |
+| BL-046 | chore | P3 | S | Ready | Drop the unused `flight_canonical_view` and `notes/REFERENCE_QUERIES.txt` (which only documents it); BL-019 is cancelled with it |
+| BL-047 | feature | P2 | S | Doing | Add South Air (IATA Z8, ICAO SQB): helpline added 2026-11-09; logo and FlightStats code (Z8 or SQB) still open. Its code Z8 previously belonged to Amaszonas (Bolivia), so generic logo and tracker sites may show the wrong airline |
 
 ### Task records
 
@@ -161,7 +166,23 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 
 **BL-014 / BL-015** Aircraft position and fare research need new sources, cost and agreement first.
 
-**BL-016** Sitemap lists `flight_detail.html` (useless without query parameters); non-local airline logos hotlink `pics.avs.io`; README to become a short pointer to these two files.
+**BL-016** Sitemap lists `flight_detail.html` (useless without query parameters); README to become a short pointer to these two files (done 2026-11-04). Logos (reviewed 2026-11-06): the four local airlines' logos are in `docs/logos/`; all others still come from `pics.avs.io`, and a failed logo is simply hidden. Recommendation: keep this (downloading 30+ foreign logos adds upkeep for little gain); only change `REPO_LOGOS` in `script.js` to the relative path `logos/`. The PAA `Logo` field is stored as `airline_logo` in every row and snapshot but no page uses it. Open PR #13 (`airline-links-logos`, 2026-11-04) downloads 32 foreign logos, against this recommendation; its FlightStats code table was ported as BL-043 on 2026-11-09. Owner to decide whether to close it.
+
+
+**BL-044** Monthly owner check, about 10 minutes, on a phone. Record the result as one journal line; anything broken becomes a new BL entry.
+1. Search page, today: arrivals and departures appear; the freshness line says minutes, not hours.
+2. A domestic arrival's details page shows the departure-airport line; an international one shows history and no departure line.
+3. Share on one local and one foreign flight: each link (FlightStats, airline status page, our page) opens the right flight or page.
+4. Logos: a local and a foreign one show (a failed logo is hidden, so look for gaps).
+5. cron-job.org and GitHub Actions: the latest runs of both jobs succeeded.
+6. Contact form (once switched on): a test message arrives.
+7. Airlines: any new code in today's results with no logo, or a known airline that stopped appearing (Serene Air `ER` grounded since Oct 2025, South Air `Z8` new).
+
+**BL-045** The site reads the origin views and falls back to the old tables only if a view errors (BL-032). Once the views are confirmed and several days of side-by-side counts agree: (1) stop the cron-job.org job for `scrape.yml`; (2) watch a few days; (3) remove `scraper.py`, `.github/workflows/scrape.yml` and the fallback branches in `script.js` and `flight_detail.js`; (4) export the three old tables, then drop them. Gains: one collector, one workflow, half the scheduled runs, three fewer tables, no fallback code. Loss: history older than 7 days (accepted in D-015). Also settles BL-010D.
+
+**BL-046** No page reads `flight_canonical_view` (checked in the repo 2026-11-06). Before dropping, check nothing in the database depends on it and save its definition privately (`SELECT pg_get_viewdef('public.flight_canonical_view', true);`). Rollback: re-create from that saved definition.
+
+**BL-047** South Air: began operations November 2025 (inaugurated in Multan), scheduled domestic flights from Karachi since 16 Jul 2026 with ATR 72s; Karachi, Islamabad, Bahawalpur, Sukkur, Gwadar, Rahim Yar Khan and others. PAA already lists it as `Z8` (e.g. `Z8921` in BL-010A, `Z8922` Islamabad-Multan on 2026-11-08); booking sites and trackers show `SQB`. No public flight-status page (website `southair.com.pk`, booking engine `z8.ibe.ejmiral.com`, no manage-booking link). 2026-11-09: owner chose the call-centre number for the share text (`051 111 222 999`, from the website footer); added to `AIRLINE_INFO` with FlightStats code `Z8` pending a live check against `SQB`. Still open: logo (`docs/logos/z8.png` and `LOCAL_AIRLINES` in `script.js`).
 
 **BL-017** Confirmed by the private owner-supplied report: excess public write privileges and missing protection on one status table. Need an explicit relation/role plan, a view security review, and preserved collector access. Accept: public reads work, unnecessary public writes denied, collector writes preserved, inherited privileges considered, safe non-destructive verification. **Keep the evidence and the SQL private** (not in this repo, not in public chats). Owner's read-only check on 2026-11-02 shows the issue is still present.
 
@@ -203,7 +224,8 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 
 **BL-043** *New 2026-11-09 (owner report: J2143 opened "Flight Status Not Available" on FlightStats).* Actual: the share box knew only PK, PA, 9P and PF; for any other airline it took the letters as the code and the rest as the number, so Azerbaijan Airlines J2143 became `J/2143` (also broke G9, F3, J9, 3L, W5, B9, Z8, and airlines FlightStats files under an ICAO code such as flyadeal FAD and SalamAir OMS). Fix in `docs/flight_detail.js`: `AIRLINE_INFO` replaced by the 35-airline table from unmerged branch `airline-links-logos` (commit 0a09a74, FlightStats codes checked against live tracker URLs on 2026-11-04 by that chat, not re-checked here); `splitFlightNumber` always takes the first two characters as the IATA code; an airline missing from the table falls back to its IATA code; a number that is not an airline flight (registration such as APESL) gets no FlightStats line and no departure-day question. AirSial keeps its manage-reservation page (owner, 2026-11-08). The header now names foreign airlines too. Rest of that branch (logos, search-page changes) is still unmerged.
 - Checks (stubbed browser, 2026-11-09): every table airline builds `/<fsCode>/123`, plus J2143 -> `/J2/143`, 9P734 -> `/FJL/734`, PK0301 -> `/PK/301`, PK301A -> `/PK/301`, unknown ZZ123 -> `/ZZ/123`, APESL and 12345 -> no link; 42 pass. BL-039 share-box checks rerun: 28 pass.
-- Still unverified: South Air (Z8) is not in the table, and FlightStats may file Z8 under the old Amaszonas airline; Riyadh Air (RX) not in the table. Live: open a share link for J2143 and one foreign airline from the board.
+- 2026-11-09 later: owner saw "Flight Status Not Available" for flyadeal `/FAD/651`. F3651 (Riyadh-Islamabad) flew Sat 7 Nov (22:20 Riyadh -> 04:20 PKT); October schedule was 00:05 -> 06:30, so the right FlightStats day changed with the schedule. Either the `FAD` code or the chosen day was wrong; owner testing dateless links `/F3/651` vs `/FAD/651`. The other ICAO-style codes from PR #13 (`ABQ`, `FJL`, `OMS`, `SEP`, `ANK`, `SMR`, `3L*`, `PF*`) carry the same doubt until checked. Added Riyadh Air (`RX`, flights RX659/RX661 Riyadh-Islamabad, RX660/RX662 back; FlightStats code unchecked against `RXI`) and South Air (`Z8`, see BL-047).
+- From PR #16's draft entry (2026-11-06): owner's intent then was FlightStats for international flights and the airline's own status page for local ones (dropping the special local codes `ABQ`, `FJL`, `PF*`); AirSial's link should be its flight-status page (`airsial.com/flight-status`). Superseded for AirSial on 2026-11-08 (owner: keep the manage-reservation page, its status page is a static picture). The local/foreign split is still open: ask the owner.
 
 **BL-042** *New 2026-11-09 (follow-up to BL-041, owner approved).* Actual: results exist only after pressing Search, so Back from a flight could land on an empty search page when the browser had not kept the page in memory (and a reload lost the search). Expected: the same results, filters and scroll position. Built in `docs/script.js` only: after each search the address becomes `index.html?date=…&q=…&type=…&route=…&city=…` (`replaceState`, so no extra Back steps); on load, a valid `date` fills the form and re-runs the search; the city is applied during that search because its options only exist afterwards; the scroll position is kept per search in `sessionStorage` when a card is tapped and restored after the re-run. Bad values are ignored (date must be `YYYY-MM-DD`, type/route must be existing options, query normalised and capped at 12 characters); a plain visit is unchanged (no auto-search, clean address). Side effect: a search can be shared as a link; opening one adds it to Recent Searches like any search.
 - Checks (2026-11-09, stubbed browser over a local server, 30 flights): plain visit unchanged; type + city search writes the address; tapping the 7th card and pressing Back shows the same 10 results at the same scroll position; reload restores search, filters and scroll; a shared link with `q=pk-304` searches `PK304`; a bad date does nothing; a bad type is ignored and an HTML city value stays harmless; no sideways scroll at 320/768/1280 px. Live: on a phone, search, open a flight, press Back (also after switching apps for a minute); open a copied search link in another browser.
@@ -375,6 +397,10 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 ### 2026-11-06 | Claude | BL-038 Islamabad-first page
 - Done: owner set the rule: show Islamabad only, unless the departure board has an update Islamabad's doesn't reflect; departure-board history behind a labelled "Airport board" switch; Islamabad's top line fixed. Agreed from chat mockups first (no test switches in code). Built the notice (cancelled / departed / 15+ min later; owner said "16", taken as the 15 discussed), the switch, shorter table dates and plain headers, About-page note. 11 stubbed scenarios x 4 widths pass, including a deliberately long status word; the older test that looked for the removed departure box is retired.
 - Next: owner checks on live flights; tune `NOTICE_MINUTES` if the notice shows too often or too rarely.
+
+### 2026-11-06 | Claude | simplicity review (merged 2026-11-09 from PR #16, IDs renumbered)
+- Done: owner asked whether the project is more complicated than it needs to be. Read the repo (code only, no live checks). Added the monthly owner check (now BL-044), retiring the old collector (BL-045), dropping the unused canonical view (BL-046), the share-link bug and local/foreign split (folded into BL-043) and South Air (BL-047); cancelled BL-019; logo note in BL-016. Serene Air: not in the code; still grounded (relaunch hoped by end of 2026); nothing to delete.
+- Next: owner sets a monthly phone reminder for BL-044; then BL-045 once the views are confirmed.
 
 ### 2026-11-05 | Claude | BL-038 simplified
 - Done: owner found the `&layout=` test link awkward and asked for the choice on the page, without "Side by side". Two buttons now sit above the history (Both airports by default, Islamabad only), switch without reloading and are remembered per browser; the combined list is newest first with larger text. Stubbed-browser checks pass (3 flights x 320/375/1280 px: buttons, switching, remembered choice, no sideways scroll, hostile text; no switcher for international, departure or missing-view cases; old links).
