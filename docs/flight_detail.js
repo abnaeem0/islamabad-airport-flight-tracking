@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ===== AIRLINE LOOKUP =====
   // Keyed by the two-character IATA code at the start of the flight number.
-  // fsCode: the code FlightStats uses in its tracker links. Usually the IATA code; where
+  // fsCode: the code FlightStats uses in its tracker links (null = FlightStats has no data). Usually the IATA code; where
   //   FlightStats needs something else (ICAO code or a trailing *), it is set here.
   //   Table from branch airline-links-logos, checked against live flightstats.com tracker
   //   URLs on 2026-11-04. An airline missing here falls back to its IATA code.
@@ -48,9 +48,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             statusUrl: 'https://www.airsial.com/manage-reservation',
             contact: '021-38732063' },
     ER:   { name: 'SereneAir',         fsCode: 'SEP' },
-    // South Air: no status page; call centre from southair.com.pk (2026-11-09). FlightStats code
-    // Z8 not yet checked (Z8 was Amaszonas before; trackers list South Air as SQB). BL-047.
-    Z8:   { name: 'South Air',         fsCode: 'Z8', contact: '051-111-222-999' },
+    // South Air: no status page; call centre from southair.com.pk. FlightStats finds it under
+    // neither Z8 nor SQB (owner checked 2026-11-09), so fsCode null = no FlightStats link. BL-047.
+    Z8:   { name: 'South Air',         fsCode: null, contact: '051-111-222-999' },
     // Foreign airlines that serve Islamabad
     EK:   { name: 'Emirates',          fsCode: 'EK', statusUrl: 'https://www.emirates.com/flightstatus' },
     EY:   { name: 'Etihad',            fsCode: 'EY', statusUrl: 'https://www.etihad.com/en/manage/flight-status' },
@@ -496,7 +496,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Returns a maker that gives '' for every date when the flight number is not a normal one.
   function fsLinkMaker() {
     const { code, digits } = splitFlightNumber(flightNumber);
-    if (!digits) return () => '';
+    if (!digits || (AIRLINE_INFO[code] && AIRLINE_INFO[code].fsCode === null)) return () => '';
     const fsCode = (AIRLINE_INFO[code] && AIRLINE_INFO[code].fsCode) || code;
     const base = `https://www.flightstats.com/v2/flight-tracker/${encodeURIComponent(fsCode)}/${parseInt(digits, 10)}`;
     return iso => {
