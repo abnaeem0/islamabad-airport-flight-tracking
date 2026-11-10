@@ -1076,6 +1076,13 @@ a.flight-card:focus-visible {
 }
 
 /* --- Departure day for the FlightStats link (BL-039) --- */
+.day-credit, .check-credit {
+  margin:    0.35rem 0 0;
+  font-size: 0.72rem;
+  color:     var(--text-muted);
+}
+.day-credit a, .check-credit a { color: var(--accent-2); }
+.check-credit { flex-basis: 100%; }
 #share-day[hidden] { display: none; }
 .day-sure {
   display:         flex;

@@ -21,7 +21,8 @@ Writes only its own tables (CLAUDE.md, D-016: new sources stay out of origin_fli
                   Rows older than KEEP_DAYS are deleted (AeroDataBox allows keeping data 7 days).
     adb_runs      one row per call: window, HTTP status, counts, and how its list compares with
                   PAA's list for the same window (our own counts; kept).
-Both tables have row-level security on and no policies: the website cannot read them yet.
+Both tables have row-level security on. adb_arrivals has a read-only policy for the site's public
+role (the share box and check links use origin_date for FlightStats); adb_runs has none.
 
 AeroDataBox statuses and predicted times are stored only as given (adb_status, isb_times) and are
 not to be shown (BL-040: statuses unreliable; no invented arrival estimates).
@@ -102,6 +103,18 @@ CREATE TABLE IF NOT EXISTS public.adb_runs (
     error            text
 );
 ALTER TABLE public.adb_runs ENABLE ROW LEVEL SECURITY;
+
+-- The site reads adb_arrivals for the FlightStats day (BL-040, owner 2026-11-11); adb_runs stays private.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    GRANT SELECT ON public.adb_arrivals TO anon;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'adb_arrivals'
+                   AND policyname = 'adb_arrivals_public_read') THEN
+      CREATE POLICY adb_arrivals_public_read ON public.adb_arrivals FOR SELECT TO anon USING (true);
+    END IF;
+  END IF;
+END $$;
 """
 
 
@@ -275,7 +288,7 @@ def main():
         return 0
     now = now_pkt()
     slots = due_slots(now)
-    if not slots:
+    if not slots and os.environ.get("ADB_SETUP") != "1":
         log(f"{now:%Y-%m-%d %H:%M} PKT: no AeroDataBox slot due.")
         return 0
 
@@ -286,6 +299,8 @@ def main():
     cur = conn.cursor()
     cur.execute(SCHEMA)
     conn.commit()
+    cur.execute("SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'adb_arrivals'")
+    log(f"Tables ready (adb_arrivals read policies: {cur.fetchone()[0]}).")
 
     calls = 0
     for slot, slot_date, wfrom, wto in slots:

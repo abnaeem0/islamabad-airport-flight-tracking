@@ -333,15 +333,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   let shareCtx = null;   // { flight, fsUrlFor, fsUrl, arrDate, origin, guess, sure, chosen }
 
   // Our answer for which day an arrival took off: departure board > correction/estimate
+  // Which day the arrival left its origin (FlightStats files flights by that day):
+  //   departure board (domestic, matched) > AeroDataBox origin leg (BL-040) > estimate.
+  // source: 'board' | 'adb' | 'estimate'
   function departureDay(snapshots) {
     const latest = snapshots[snapshots.length - 1];
     if (dep && /^\d{4}-\d{2}-\d{2}$/.test(dep.row.departure_date || '')) {
-      return { guess: dep.row.departure_date, sure: true };
+      return { guess: dep.row.departure_date, sure: true, source: 'board' };
+    }
+    const od = adb && adb.origin_date;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(od || '') && (od === date || od === dayBefore(date))) {
+      return { guess: od, sure: true, source: 'adb' };
     }
     const timed = [...snapshots].reverse().find(s => toMinutes(s.st) !== null) || latest;
     const est = estimateDeparture(flightNumber, latest.city || timed.city, date, timed.st);
-    if (!est || (est.date !== date && est.date !== dayBefore(date))) return { guess: null, sure: false };
-    return { guess: est.date, sure: est.sure };
+    if (!est || (est.date !== date && est.date !== dayBefore(date))) return { guess: null, sure: false, source: 'estimate' };
+    return { guess: est.date, sure: est.sure, source: 'estimate' };
   }
 
   function renderDaySure() {
@@ -351,7 +358,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="day-sure">
         <span class="day-sure-text">🛫 FlightStats: flight${from} on ${esc(dayLabel(shareCtx.chosen))}</span>
         <button type="button" class="day-change">Change</button>
-      </div>`;
+      </div>${shareCtx.source === 'adb' && shareCtx.chosen === shareCtx.guess
+        ? '<p class="day-credit">Departure day from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></p>' : ''}`;
   }
 
   function renderDayQuestion() {
@@ -405,7 +413,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       fsDate = d.guess;
       const origin = latest.city && latest.city !== '—' ? latest.city : '';
       shareCtx = { fsUrlFor, fsUrl: fsUrlFor(fsDate), arrDate: date, origin,
-                   guess: d.guess, sure: d.sure, chosen: d.guess };
+                   guess: d.guess, sure: d.sure, chosen: d.guess, source: d.source };
       box.hidden = false;
       if (d.sure) renderDaySure(); else renderDayQuestion();
     } else {
@@ -494,11 +502,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       `<a class="check-chip" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}${ext ? ' target="_blank" rel="noopener"' : ''}>${text}${ext ? ' <span class="check-ext" aria-hidden="true">↗</span>' : ''}</a>`;
     const chips = [];
 
+    let credit = '';
     if (fsUrlFor(date)) {
       if (isArrival) {
         const d = departureDay(snapshots);
         if (d.sure) {
           chips.push(chip(fsUrlFor(d.guess), '🛰️ FlightStats', true));
+          if (d.source === 'adb') credit = '<p class="check-credit">FlightStats day from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></p>';
         } else {
           [dayBefore(date), date].forEach(iso => chips.push(chip(fsUrlFor(iso), `🛰️ FlightStats · left ${esc(dayLabel(iso))}`, true)));
         }
@@ -521,6 +531,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="check-links">
         <p class="check-label">Check it yourself</p>
         ${chips.join('')}
+        ${credit}
       </div>`;
   }
 
@@ -583,6 +594,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let board    = 'isb';  // which history is showing: 'isb' or 'dep'
   let isbSnaps = [];
   let dep      = null;   // { row, snaps } for a matched domestic arrival, else null
+  let adb      = null;   // AeroDataBox origin leg for an arrival (adb_arrivals row), else null (BL-040)
   let isArrivalFlight = true;
 
   function minutesSince(dateStr) {
@@ -592,6 +604,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   function clockPKT(dateStr) {
     const n = dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : dateStr + 'Z';
     return new Date(n).toLocaleTimeString('en-GB', { timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  // AeroDataBox origin leg (BL-040): only the origin's day is used, for the FlightStats link.
+  // Missing table, no row or any error -> null, and the estimate is used instead.
+  async function fetchAdb(flightType) {
+    if (flightType !== 'Arrival') return null;
+    try {
+      const { data, error } = await client
+        .from('adb_arrivals')
+        .select('origin_date,origin_iata,origin_sched_local')
+        .eq('flight_number', flightNumber)
+        .eq('isb_date', date)
+        .limit(2);
+      return (!error && Array.isArray(data) && data.length === 1) ? data[0] : null;   // two rows: ambiguous, skip
+    } catch (e) {
+      return null;
+    }
   }
 
   async function fetchDeparture(flightType) {
@@ -785,7 +814,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       isbSnaps        = snapshots;
       isArrivalFlight = isArrival;
-      dep             = await fetchDeparture(first.type);
+      [dep, adb]      = await Promise.all([fetchDeparture(first.type), fetchAdb(first.type)]);
       flightInfoDiv.insertAdjacentHTML('beforeend', checkLinksHtml(snapshots));
       renderNotice(latest);
       renderBoard();
