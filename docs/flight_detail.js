@@ -481,6 +481,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     return lines.join('\n');
   }
 
+  // ===== CHECK IT YOURSELF (BL-049) =====
+  // The links the share message carries (FlightStats, the airline's status page, its helpline),
+  // shown on the page as a row of chips under Islamabad's line. FlightStats uses the same day as
+  // the share box: when that day is uncertain, both possible days get their own chip.
+  function checkLinksHtml(snapshots) {
+    const latest    = snapshots[snapshots.length - 1];
+    const isArrival = (latest.type || '').toLowerCase() === 'arrival';
+    const airline   = getAirlineInfo(flightNumber);
+    const fsUrlFor  = fsLinkMaker();
+    const chip = (href, text, ext, title) =>
+      `<a class="check-chip" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}${ext ? ' target="_blank" rel="noopener"' : ''}>${text}${ext ? ' <span class="check-ext" aria-hidden="true">↗</span>' : ''}</a>`;
+    const chips = [];
+
+    if (fsUrlFor(date)) {
+      if (isArrival) {
+        const d = departureDay(snapshots);
+        if (d.sure) {
+          chips.push(chip(fsUrlFor(d.guess), '🛰️ FlightStats', true));
+        } else {
+          [dayBefore(date), date].forEach(iso => chips.push(chip(fsUrlFor(iso), `🛰️ FlightStats · left ${esc(dayLabel(iso))}`, true)));
+        }
+      } else {
+        chips.push(chip(fsUrlFor(date), '🛰️ FlightStats', true));
+      }
+    }
+    if (airline.statusUrl && airline.statusUrl !== '#') {
+      chips.push(chip(airline.statusUrl, `✈️ ${esc(airline.name)} status`, true));
+    }
+    // Helpline: dial the first number (the local one); the full text shows on hover
+    if (airline.contact && airline.contact !== 'N/A') {
+      const tel = String(airline.contact).split('(')[0].replace(/[^\d+]/g, '');
+      if (tel) {
+        chips.push(chip(`tel:${tel}`, `📞 Call ${esc(airline.name)}`, false, airline.contact));
+      }
+    }
+    if (!chips.length) return '';
+    return `
+      <div class="check-links">
+        <p class="check-label">Check it yourself</p>
+        ${chips.join('')}
+      </div>`;
+  }
+
   // Inject the Share button into #flight-info (called after header renders)
   function injectShareButton(snapshots) {
     const btn = document.createElement('button');
@@ -743,6 +786,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       isbSnaps        = snapshots;
       isArrivalFlight = isArrival;
       dep             = await fetchDeparture(first.type);
+      flightInfoDiv.insertAdjacentHTML('beforeend', checkLinksHtml(snapshots));
       renderNotice(latest);
       renderBoard();
 

@@ -1,11 +1,12 @@
 # PLAN.md: Islamabad Flight Tracker
 
 Spec, decisions, backlog, journal and the current handoff, in one place. Stable rules and architecture are in `CLAUDE.md`.
-This merges the repo's earlier doc set (`AGENTS.md`, `docs/SPEC|BACKLOG|DECISIONS|JOURNAL|DB|WORKFLOW.md`, dated 2026-09-30) and keeps its task IDs. Last updated: 2026-11-09.
+This merges the repo's earlier doc set (`AGENTS.md`, `docs/SPEC|BACKLOG|DECISIONS|JOURNAL|DB|WORKFLOW.md`, dated 2026-09-30) and keeps its task IDs. Last updated: 2026-11-10.
 Public repo: no email, phone, credentials or security details in this file.
 
 ## 1. Current handoff
 
+- **2026-11-10:** BL-049 ("Check it yourself" chips on the flight page: FlightStats, airline status, call the airline) built on branch `check-links-on-page`, PR open, checked in a stubbed browser only. Owner: merge, then on a phone open a PIA arrival and a Dubai night arrival and tap each chip.
 - **2026-11-09 (later):** BL-041 (tap a search result to open it; History button replaced by an arrow) and BL-042 (search kept in the address, so Back/reload/shared links show the same results and scroll) merged to `main` by the owner's instruction, checked in a stubbed browser. Owner: on a phone, search, open a flight, press Back; rollback is reverting the two merge commits.
 - **2026-11-09:** BL-039 (FlightStats link date, share box asks the sender when unsure, editable message, any WhatsApp country code) is merged to main, checked in a stubbed browser only. Waiting on the owner's phone check and city list (query in BL-039). BL-040 captured: real origin times from a cheap flight-data service, later. 
 - **Goal now:** live-check the BL-036 details card, switch on the contact form (needs the owner's key), then pick one small task.
@@ -79,7 +80,7 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-049**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-050**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -135,6 +136,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-045 | chore | P1 | M | Blocked | Retire the old Islamabad collector: stop dispatching `scrape.yml`, then remove `scraper.py`, its workflow and the site's fallback reads; export, then drop `flights`, `flight_snapshots`, `scraper_status`. Blocked on BL-032 live checks |
 | BL-046 | chore | P3 | S | Ready | Drop the unused `flight_canonical_view` and `notes/REFERENCE_QUERIES.txt` (which only documents it); BL-019 is cancelled with it |
 | BL-047 | feature | P2 | S | Doing | Add South Air (IATA Z8, ICAO SQB): helpline added 2026-11-09; FlightStats has no South Air data (owner checked Z8 and SQB), so no FlightStats link; logo still open. Its code Z8 previously belonged to Amaszonas (Bolivia), so generic logo and tracker sites may show the wrong airline |
+| BL-049 | feature | P2 | S | Testing | Flight page shows the share message's outside links as chips under Islamabad's line ("Check it yourself"): FlightStats, the airline's status page, call the airline. Share button unchanged. Branch `check-links-on-page` |
 | BL-048 | feature | P2 | M | Testing | Search page: one box for flight, airline or city with suggestions; the day's list loads at once and narrows as you type; day arrows; Arrivals/Departures and route as full-width toggles; cards with 48 px logo, airline name and coloured status; Recent saves opened flights and settled searches |
 
 ### Task records
@@ -389,8 +391,16 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 ## 6. Repo tidy-up for the two-file switch
 
 **Done 2026-11-04.** Kept for reference. After saving `CLAUDE.md` and `PLAN.md` at the repo root, delete (git history keeps them): root `AGENTS.md`; `docs/SPEC.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/JOURNAL.md`, `docs/DB.md`, `docs/WORKFLOW.md`, `docs/readme`. Replace `README.md` with a three-line pointer to the two files. Keep `notes/REFERENCE_QUERIES.txt`. Do not put the new files in `docs/` (that folder is the published website). The old draft PR #4 uses a competing layout: close it rather than merging.
+**BL-049** *New 2026-11-10 (owner: the links are only in the share box; visitors checking for themselves should see them too).* Owner chose chips inside the card (option A) over a separate list, and kept Share at the top right (A1), from chat mockups. Built in `docs/flight_detail.js` (`checkLinksHtml`, drawn after the departure-board match so it uses the same day as the share box) and `docs/style.css` (`.check-links`, `.check-chip`):
+- FlightStats chip opens the same link the share message carries. For arrivals where the share box would ask which day it took off, both days get a chip ("FlightStats · left Mon 9 Nov", "· left Tue 10 Nov") instead of guessing. No chip when there is no FlightStats link (South Air, registrations).
+- Airline status chip only where `statusUrl` is set; call chip only where `contact` is set, dialling the first (local) number, full text on hover. Outside links open in a new tab. No chips at all: the row is not shown.
+- Checks (stubbed browser, 2026-11-10): PIA arrival (one FlightStats chip, status, call), Emirates night arrival (two day chips), PIA departure, South Air (call only), registration (no row), HTML in city text; FlightStats chip matches the share message link; no sideways scroll at 320/390/1280 px; no script errors. Not yet seen on a real phone.
 
 ## 7. Journal (newest first)
+
+### 2026-11-10 | Claude | BL-049 links on the flight page
+- Done: owner picked chips in the card from mockups, Share stays top right. Built and checked in a stubbed browser; branch `check-links-on-page`, PR open, not merged.
+- Next: owner merges and taps each chip on a phone.
 
 ### 2026-11-09 | Claude | BL-048 one-box search
 - Done: search page rebuilt as one box (flight, airline or city) with suggestions, day arrows, full-width toggles, airline-name cards with 48 px logos and coloured status; Recent saves opened flights and settled searches; today's list opens at a "Now" line. Owner approved from screenshots; merged to main. Airline list moved to shared `airlines.js`. Closed PR #13 (logos not taken). 40 + 28 + 44 stubbed-browser checks pass. 
