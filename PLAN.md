@@ -6,6 +6,7 @@ Public repo: no email, phone, credentials or security details in this file.
 
 ## 1. Current handoff
 
+- **2026-11-10 (later):** airline status pages planned as a second source for local airlines (D-016): BL-051 collector for PIA and Fly Jinnah, stored in its own tables and not shown yet; BL-052 shows it on the site later; BL-053 Airblue, waiting for Airblue's permission. Tested 2026-11-07/10: PIA and Fly Jinnah answer plain scripts from the owner's home connection; Airblue answers scripts with a Cloudflare check page; AirSial and South Air publish no status; free ADS-B feeds do not see Islamabad approaches. Nothing built. Next: owner approves BL-051's design (then checkpoint 1); owner writes to Airblue (BL-053).
 - **2026-11-10:** BL-049 ("Check it yourself" chips on the flight page: FlightStats, airline status, call the airline) merged to `main` (PR #20) by the owner's instruction, checked in a stubbed browser only. Owner: on a phone open a PIA arrival and a Dubai night arrival and tap each chip.
 - **2026-11-09 (later):** BL-041 (tap a search result to open it; History button replaced by an arrow) and BL-042 (search kept in the address, so Back/reload/shared links show the same results and scroll) merged to `main` by the owner's instruction, checked in a stubbed browser. Owner: on a phone, search, open a flight, press Back; rollback is reverting the two merge commits.
 - **2026-11-09:** BL-039 (FlightStats link date, share box asks the sender when unsure, editable message, any WhatsApp country code) is merged to main, checked in a stubbed browser only. Waiting on the owner's phone check and city list (query in BL-039). BL-040 captured: real origin times from a cheap flight-data service, later. 
@@ -75,12 +76,13 @@ Accepted owner choices, proposals and observed implementation are different thin
 | D-013 | **Two doc files only:** `CLAUDE.md` (rules, architecture) and `PLAN.md` (everything else). Claude hands back full updated files; other LLMs give paste-in wrap-ups. 2026-11-01 | Accepted, owner |
 | D-015 | **Site reads the origin tables for Islamabad** (through the views `isb_flights_view` and `isb_snapshots_view`); 7-day retention is accepted; the origin collector always fetches yesterday for Islamabad. Old tables and the old collector stay untouched until the owner says to stop it. 2026-11-03 | Accepted, owner |
 | D-014 | **No public email or phone.** Contact goes through a form that emails the owner, with an optional callback request. Supersedes the plain-email fix in BL-005. 2026-11-01 | Accepted, owner |
+| D-016 | **Airline status pages as a second source for local airlines.** Use the airlines' own pages where they answer plain requests (PIA, Fly Jinnah). Pull the bulk page where one exists, else one page per route, and only around the times flights change; per-flight pulls only when the airport data leaves a gap; keep total load small (target under about 100 requests a day); review the sources monthly (BL-044). Airblue only with Airblue's permission, by browser automation if that is what they allow, even at a lower rate (BL-053). Airline data stays out of `origin_flights` until BL-052 agrees how to show it. The structure in BL-051 is Proposed. 2026-11-10 | Accepted, owner (direction) |
 
 Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Superseded); task ID; problem; decision; alternatives; affected contracts; rollback; evidence; unknowns.` Accepted does not mean shipped; record the commit separately.
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-050**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-054**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -138,6 +140,9 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-047 | feature | P2 | S | Doing | Add South Air (IATA Z8, ICAO SQB): helpline added 2026-11-09; FlightStats has no South Air data (owner checked Z8 and SQB), so no FlightStats link; logo still open. Its code Z8 previously belonged to Amaszonas (Bolivia), so generic logo and tracker sites may show the wrong airline |
 | BL-049 | feature | P2 | S | Testing | Flight page shows the share message's outside links as chips under Islamabad's line ("Check it yourself"): FlightStats, the airline's status page, call the airline. Share button unchanged. Merged 2026-11-10 (PR #20); live check pending |
 | BL-048 | feature | P2 | M | Testing | Search page: one box for flight, airline or city with suggestions; the day's list loads at once and narrows as you type; day arrows; Arrivals/Departures and route as full-width toggles; cards with 48 px logo, airline name and coloured status; Recent saves opened flights and settled searches |
+| BL-051 | feature | P2 | M | Ready | Airline status collector, phase 1: PIA and Fly Jinnah status pages for Islamabad flights, polled only in change windows, stored in `airline_legs` with a fetch log; one config file for timing and switches; not shown on the site |
+| BL-052 | feature | P2 | S | Inbox | Show airline-reported times on the site (e.g. "PIA reports it left Jeddah 03:57"), with source and age; needs a display rule; blocked on BL-051 |
+| BL-053 | research | P3 | S | Blocked | Airblue: its status pages answer scripts with a Cloudflare check; ask Airblue for permission (a fixed IP to allow, or browser automation at a low rate). Adapter stays off until they agree |
 
 ### Task records
 
@@ -180,6 +185,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 5. cron-job.org and GitHub Actions: the latest runs of both jobs succeeded.
 6. Contact form (once switched on): a test message arrives.
 7. Airlines: any new code in today's results with no logo, or a known airline that stopped appearing (Serene Air `ER` grounded since Oct 2025, South Air `Z8` new).
+8. Airline sources (once BL-051 runs): the health query shows no source paused or empty for days. News: Air Karachi or Air Punjab flying, Serene Air back, AirSial or South Air with a status page, PIA's site changed, a reply from Airblue (BL-053).
 
 **BL-045** The site reads the origin views and falls back to the old tables only if a view errors (BL-032). Once the views are confirmed and several days of side-by-side counts agree: (1) stop the cron-job.org job for `scrape.yml`; (2) watch a few days; (3) remove `scraper.py`, `.github/workflows/scrape.yml` and the fallback branches in `script.js` and `flight_detail.js`; (4) export the three old tables, then drop them. Gains: one collector, one workflow, half the scheduled runs, three fewer tables, no fallback code. Loss: history older than 7 days (accepted in D-015). Also settles BL-010D.
 
@@ -253,6 +259,64 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 - Page: remove the `mailto:` link and the visible address; **complete the truncated footer** so the page matches the others.
 - Needs: current `docs/contact.html`; the owner creates the form key privately.
 - Accept: test message arrives; view-source of the page contains no personal address or number; empty submit rejected; footer and navigation complete on mobile.
+
+**BL-051** *New 2026-11-10 (owner: pull local airlines' statuses in bulk, as little load on them as possible; easy to retune, extend and monitor; D-016).* User need: the PAA boards often lack actual times and delays for local airlines, and international arrivals have no origin side (BL-034, BL-037, BL-040). The airlines' own pages have both ends.
+- **Tested** 2026-11-07 (built-in browser) and 2026-11-10 (plain Python from the owner's home connection, about 30 requests, no blocks for these two):
+
+  | Source | Airline | Kind | Request | Gives |
+  |---|---|---|---|---|
+  | `pia_departures` | PK | board | GET `https://book-pia.crane.aero/ibe/flightStatus/routeSearch/?tab=departure&depPort=ISB&startDate=10%20Nov%202026` | every PK departure from ISB that day (10 on 10 Nov): scheduled, estimated and actual at both ends |
+  | `pia_route` | PK | route | same URL with `tab=route&depPort=KHI&arrPort=ISB` | every PK flight on that route that day. PIA has no arrivals-by-airport page |
+  | `flyjinnah_route` | 9P | route | POST `https://www.flyjinnah.com/api/FlightStatus/Flightstatus` with `{"dataModel":{"deparureDate":"10/11/2026","origin":"KHI","destination":"ISB"}}` (sic) | every 9P flight on the route: UTC and local schedule, estimate, off/on-block, takeoff and touchdown |
+  | `airblue_board` | PA | board | GET `https://www.airblue.com/m/mobile-page.asp?type=Arrivals&city=ISB&date=10-Nov-2026` | off: BL-053 |
+
+  Quirks: PIA times are station-local on a 12-hour clock; PIA keeps search state per session and once returned the previous search for a malformed query, so keep only rows matching the ports asked for. Fly Jinnah needs a route or a flight number (origin only is rejected); unset times come back as `1970-01-01T00:00:00`; its arrival side can lag (10 Nov: 9P670 still "DEPARTED", no touchdown, an hour after it was due). Both serve yesterday's date.
+- **Files** (one script, one config, one test file):
+  - `airline_collector.py` in four parts. **Adapters:** one small block per source that builds the request and a pure `parse(page) -> legs`. **Planner:** decides what to fetch (below). **Fetcher:** one request at a time, 2-5 s apart, an honest User-Agent naming the site; `http`, or `browser` (Playwright) only for a source that allowed it. **Writer:** upserts `airline_legs`, appends `airline_fetch_log`. Flags `--dry-run` (print the plan; no requests, no writes) and `--no-write` (fetch and parse only), so it can be tested without touching data (CLAUDE.md section 5 rule 5).
+  - `airline_sources.toml`: every switch and timing, so retuning needs no code change. Adding an airline = one adapter + one config block; changing approach (e.g. PIA by flight number instead of by route) = change `kind` where the adapter supports it.
+  - `tests/test_airline_parsers.py`: saved real pages per source (delayed, cancelled, no actual yet, unset times, PIA stale-session rows) plus planner cases with a fixed clock.
+
+  ```toml
+  [defaults]
+  min_refetch_minutes = 15                  # never the same page twice within this
+  gap_seconds = [2, 5]                      # pause between requests
+  pause_on = ["403", "429", "challenge"]    # source paused until the next PKT day
+  daily_cap = 150                           # per source, safety net
+  [windows]                                 # minutes from estimated (else scheduled) time
+  before_departure = [-120]
+  after_departure = [10, 40]
+  after_arrival = [10, 40, 70, 100, 130, 160]   # until an actual appears, then give up
+  morning_sweep = "04:30"                   # PKT: yesterday once, for late actuals
+  [source.pia_departures]
+  enabled = true
+  kind = "board"
+  every_minutes = 60                        # while a PK departure is 2 h ahead to 1 h behind
+  [source.pia_route]
+  enabled = true
+  kind = "route"
+  trigger = "gap"
+  [source.flyjinnah_route]
+  enabled = true
+  kind = "route"
+  trigger = "gap"
+  [source.airblue_board]
+  enabled = false                           # BL-053
+  fetch = "browser"
+  every_minutes = 120
+  ```
+- **Planner** (each run, every 15 min): read today's Islamabad rows for the enabled airlines from `isb_flights_view`. A flight needs help when it is in a window **and** the airport data has a gap: a delay or ET 15+ min off ST, no ET, overdue (10 min past ET/ST without Landed/Departed), or an international arrival with no origin time yet (once per flight per day). Then pick the fewest pages that cover those flights (board before route before single flight; two flights on one route = one request), and drop pages fetched within `min_refetch_minutes` or belonging to a paused source. Most runs send 0-3 requests. Expected load: about 20 PIA board pulls, 30-60 route pulls and about 10 sweep pulls a day, under about 100 in total (estimate; measure on the live day).
+- **Tables** (proposed; SQL written in the build chat with checks and rollback):
+  - `airline_legs`: one current row per airline, flight number and origin-local departure date (key): origin, destination, scheduled/estimated/actual departure and arrival as `timestamptz` (station-local times converted with an airport time-zone table), the airline's raw status text, `source`, `first_seen`, `fetched_at`. No history in phase 1; keep 7 days like the origin tables.
+  - `airline_fetch_log`: one row per request, or per planned request that was skipped: `at` (UTC), `source`, `target` (`KHI-ISB 2026-11-10`), `reason` (window, gap, sweep, board), HTTP status, `outcome` (`ok`, `empty`, `blocked`, `error`, `parse_fail`, `skipped_paused`, `skipped_recent`), flights parsed, `missing` (flight numbers the planner wanted that the page did not contain), milliseconds. Keep 30 days. This is the record of where data is not coming through.
+  - Rows carry `data_source = 'airline_web'` (already in `source_priority`). **Do not write airline rows into `origin_flights`:** the site's views rank sources with `priority DESC`, so `airline_web` (20) would replace PAA's own rows (10) on the site. Correct the header comment in `origin_scraper.py` that says future scrapers write to the same tables. BL-052 decides how airline data is shown.
+- **Health** (queries saved with the SQL): per source over the last 24 h, counts by outcome; flights wanted but never found, per day; sources paused now. A run exits with an error the first time a source is paused in a day, so a failed GitHub run (or cron mail on the Linux machine) tells the owner; BL-044 item 8 reads the health query monthly.
+- **Where it runs:** checkpoint 2 is one `--no-write` run from a GitHub Actions runner. If PIA and Fly Jinnah answer there, it becomes a third workflow on the same cron-job.org dispatch (no home machine). If not, the owner's Linux machine at home runs it from cron every 15 minutes, with the database settings in an environment file kept out of the repo.
+- **Checkpoints:** (1) parsers and planner with fixtures, `--dry-run`; (2) one `--no-write` run from GitHub Actions; (3) tables SQL applied; (4) one supervised live day.
+- **Accept:** parser and planner fixtures pass; `--dry-run` sends nothing; the live day stays under the request target with no `blocked` outcome; `airline_legs` has a row for at least 90% of the PK and 9P Islamabad flights that hit a gap; the site and its views are unchanged.
+
+**BL-052** *New 2026-11-10.* Show what the airline reports once BL-051 has about a week of data, e.g. under Islamabad's line: "PIA reports: left Jeddah 03:57, due 11:23 (PIA website, 6 min ago)". Needs owner decisions: where it appears, when it counts as stale, what to show when it disagrees with the airport board. Never present it as the airport's status; always label the source and its age. Blocked on BL-051.
+
+**BL-053** *New 2026-11-10 (owner: try Airblue by browser automation, even if it means polling less, if Airblue allows).* On 2026-11-10 Airblue's status pages answered a plain script with a Cloudflare check page ("Just a moment... Enable JavaScript and cookies") on the first request; they load normally in a browser. Getting past that check without permission is out (D-016). Step 1: the owner writes to Airblue's web or IT team asking to read the mobile status pages automatically at a low rate (a few dozen requests a day for Islamabad), offering a fixed IP for them to allow and a way to reach the site. Whatever they allow goes into `airline_sources.toml`: an allowed IP means plain `http`; otherwise `fetch = "browser"` with Playwright at `every_minutes = 120` or whatever they ask. Board and per-flight parsers already exist (tested on pages captured 2026-11-07). Accept: permission received (record the date only; keep the correspondence private); one supervised day within their limits. Blocked on the reply.
 
 ### Applied edits (merged 2026-11-01, commit `9d4e72f`, PR #5)
 
@@ -397,6 +461,11 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 - Checks (stubbed browser, 2026-11-10): PIA arrival (one FlightStats chip, status, call), Emirates night arrival (two day chips), PIA departure, South Air (call only), registration (no row), HTML in city text; FlightStats chip matches the share message link; no sideways scroll at 320/390/1280 px; no script errors. Not yet seen on a real phone.
 
 ## 7. Journal (newest first)
+
+### 2026-11-10 | Claude | airline status sources (BL-051..053)
+- Done: checked the local airlines' status pages (built-in browser 2026-11-07; plain Python from the owner's PC 2026-11-10): PIA and Fly Jinnah answer scripts; Airblue shows scripts a Cloudflare check; AirSial (static picture) and South Air publish nothing. Free ADS-B feeds (adsb.lol, adsb.fi, OpenSky) do not see Islamabad approaches; airplanes.live now needs registration. Planned the collector (BL-051), the site display (BL-052) and the Airblue request (BL-053); added D-016. Found that the views' `priority DESC` would let `airline_web` rows replace PAA rows.
+- IDs: BL-050 is taken by open PR #21 (flights moved past midnight), so this uses BL-051..053; next unused is BL-054 once both are merged.
+- Next: owner approves BL-051's design, then checkpoint 1; owner writes to Airblue.
 
 ### 2026-11-10 | Claude | BL-049 links on the flight page
 - Done: owner picked chips in the card from mockups, Share stays top right. Built and checked in a stubbed browser; merged to main (PR #20) by the owner's instruction.

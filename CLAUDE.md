@@ -30,7 +30,7 @@ Data flow: PAA API -> collector (flatten, normalise flight number, compare with 
 - **Terminal statuses:** `Dropped, Cancelled, Landed, Departed`. They are excluded from drop detection only; ordinary upserts and change snapshots still process them. Do not repeat the old code comment that says otherwise.
 - **Change types:** `new, status_change, time_change, city_change, dropped`.
 - **Time:** the owner says displayed PAA times are PKT. Airport dates should be computed in `Asia/Karachi`; observations we generate (`scraped_at`, `last_checked`, `last_run`) are UTC (verified for `scraped_at` on 2026-11-02). Original tables store some of those without a timezone. Do not cast or migrate historical timestamps blindly (BL-009).
-- **`data_source`** (today `paa`) names a feed; every source must exist in `source_priority`.
+- **`data_source`** (today `paa`) names a feed; every source must exist in `source_priority`. The views pick the **highest** `priority` number (`priority DESC`), so a new source written into `origin_flights` would outrank PAA on the site. Keep new sources (airline pages, ADS-B) in their own tables until a display rule is agreed (D-016, BL-051).
 - **Dropped** means "vanished from the feed", not confirmed cancellation. Never present stale or partial data as fresh.
 - **Airport board data is not aircraft position.** Do not invent estimated arrival times unless a rule is agreed.
 - **Secrets:** DB credentials are environment variables only. The Supabase publishable key in the JS is fine; a service or secret key must never be committed.
