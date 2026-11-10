@@ -312,11 +312,10 @@ def test_unknown_city_and_cancelled():
 
 def test_disabled_source_and_missing_et_switch():
     a = flight("9P670", "Arrival", "Karachi", "09:05", None, "Expected")
-    assert len(run_plan([a], pkt(D, "07:15"))[0]) == 1
+    assert run_plan([a], pkt(D, "07:15"))[0] == []           # default: a blank ET is not a gap
     cfg = copy.deepcopy(CFG)
-    cfg["gap"]["missing_et"] = False
-    assert run_plan([a], pkt(D, "07:15"), cfg=cfg)[0] == []
     cfg["gap"]["missing_et"] = True
+    assert len(run_plan([a], pkt(D, "07:15"), cfg=cfg)[0]) == 1
     cfg["source"]["flyjinnah_route"]["enabled"] = False
     assert run_plan([a], pkt(D, "07:15"), cfg=cfg)[0] == []
 

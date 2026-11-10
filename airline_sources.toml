@@ -19,7 +19,7 @@ morning_sweep = "04:30"         # Pakistan time: re-read yesterday's pages once,
 [gap]                           # what counts as "the airport data leaves a gap"
 et_off_minutes = 15             # ET this far from ST
 overdue_minutes = 10            # past ET/ST without Landed / Departed
-missing_et = true               # a blank ET counts as a gap (turn off if PAA often leaves it blank)
+missing_et = false              # a blank ET is not a gap: PAA leaves ET blank on most rows (48 of 53 on 2026-11-11)
 
 [fallback]                      # airport data stale: PAA down or Origin Scraper failed
 when_airport_data_older_than_minutes = 45

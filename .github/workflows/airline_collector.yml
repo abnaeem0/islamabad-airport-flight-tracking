@@ -61,7 +61,7 @@ jobs:
         run: |
           case "$EVENT" in
             workflow_dispatch) MODE="$MODE_INPUT" ;;
-            push)              MODE="no-write" ;;
+            push)              MODE="dry-run" ;;
             *)                 MODE="live" ;;
           esac
           echo "Mode: $MODE"
