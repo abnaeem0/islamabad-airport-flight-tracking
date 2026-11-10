@@ -1,0 +1,80 @@
+# .github/workflows/airline_collector.yml
+#
+# BL-051: reads PIA and Fly Jinnah status pages for Islamabad flights (airline_collector.py).
+# Starts when "Origin Scraper" finishes, whether it succeeded or failed (so it still helps when
+# PAA is down); no schedule of its own. Most runs send no requests at all. Timing and switches:
+# airline_sources.toml. Writes only airline_legs and airline_fetch_log (never origin_flights).
+# Manual runs: Actions -> Airline Collector -> Run workflow, with a mode.
+
+name: Airline Collector
+
+on:
+  workflow_run:
+    workflows: ["Origin Scraper"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run = plan only; no-write = fetch but save nothing; live = fetch and save"
+        type: choice
+        options: [dry-run, no-write, live]
+        default: dry-run
+  push:
+    branches: [bl-051-airline-collector]   # TEMPORARY: no-write test on the PR branch; remove before merge
+
+concurrency:
+  group: airline-collector
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 psycopg2-binary
+
+      - name: Tests (no network, no database)
+        run: python tests/test_airline_collector.py
+
+      - name: Run airline collector
+        env:
+          DB_HOST:     ${{ secrets.DB_HOST }}
+          DB_NAME:     ${{ secrets.DB_NAME }}
+          DB_USER:     ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_PORT:     ${{ secrets.DB_PORT }}
+          EVENT:       ${{ github.event_name }}
+          MODE_INPUT:  ${{ inputs.mode }}
+        run: |
+          case "$EVENT" in
+            workflow_dispatch) MODE="$MODE_INPUT" ;;
+            push)              MODE="no-write" ;;
+            *)                 MODE="live" ;;
+          esac
+          echo "Mode: $MODE"
+          case "$MODE" in
+            dry-run)  python airline_collector.py --dry-run ;;
+            no-write)
+              if [ "$EVENT" = "push" ]; then
+                T=$(TZ=Asia/Karachi date +%F)
+                python airline_collector.py --no-write \
+                  --page pia_departures "ISB departures $T" --page flyjinnah_route "KHI-ISB $T"
+              else
+                python airline_collector.py --no-write
+              fi ;;
+            live)     python airline_collector.py ;;
+            *)        echo "::error::Unknown mode $MODE"; exit 1 ;;
+          esac

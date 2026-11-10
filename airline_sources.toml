@@ -1,0 +1,43 @@
+# airline_sources.toml: every switch and timing for airline_collector.py (BL-051, D-016).
+# Change timing here, not in the code. Times are minutes unless the name says otherwise.
+
+[defaults]
+min_refetch_minutes = 15        # never fetch the same page twice within this
+gap_seconds = [2, 5]            # random pause between two requests
+max_requests_per_run = 6        # hard stop for one run
+daily_cap = 60                  # per source, per Pakistan day; total target under ~100 a day
+pause_on_block = true           # a 403/429/check page pauses that source until the next Pakistan day
+max_lateness = 45               # a checkpoint missed by more than this is skipped, not caught up
+user_agent = "IslamabadFlightTracker/1.0 (+https://abnaeem0.github.io/islamabad-airport-flight-tracking/)"
+
+[windows]                       # checkpoints, in minutes from the flight's estimated (else scheduled) time
+before_departure = [-120]       # delays usually get posted around here
+after_departure = [10, 40]      # actual departure appears
+after_arrival = [10, 40, 70, 100, 130, 160]   # Islamabad arrivals only; stops once an actual arrival is held
+morning_sweep = "04:30"         # Pakistan time: re-read yesterday's pages once, for late actual times
+
+[gap]                           # what counts as "the airport data leaves a gap"
+et_off_minutes = 15             # ET this far from ST
+overdue_minutes = 10            # past ET/ST without Landed / Departed
+missing_et = true               # a blank ET counts as a gap (turn off if PAA often leaves it blank)
+
+[fallback]                      # airport data stale: PAA down or Origin Scraper failed
+when_airport_data_older_than_minutes = 45
+route_every_minutes = 60        # each route page at most this often; daily caps still apply
+
+[source.pia_departures]         # one page = every PIA departure from Islamabad that day
+enabled = true
+airline = "PK"
+every_minutes = 60              # while a PIA departure is due 2 h ahead to 1 h behind
+daily_cap = 24
+
+[source.pia_route]              # one page = every PIA flight on one route that day (Islamabad arrivals)
+enabled = true
+airline = "PK"
+
+[source.flyjinnah_route]        # one page = every Fly Jinnah flight on one route that day (both directions)
+enabled = true
+airline = "9P"
+
+# Airblue is not collected: its pages show automated clients a check page. Switch on only with
+# Airblue's permission, in whatever form they allow (BL-053).
