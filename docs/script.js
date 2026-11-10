@@ -29,6 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let loadedFor = null;    // date dayRows belongs to
   let loadToken = 0;       // ignores answers to an older day's request
   let lastRun   = null;    // collector's last run (freshness line)
+  let dayMoves  = [];      // BL-050: flights moved to or from this day after a delay past midnight
+  const Moves   = window.FlightMoves || null;   // flight_moves.js; the page works without it
 
   // A search kept in the address (BL-042): restored on Back, reload, or a shared search link.
   // Today's date is left out of the address, so a reload tomorrow opens the new today; any other
@@ -227,13 +229,16 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       // Reads the origin-based view; if it is missing or errors, falls back to the original table
       const run = table => client.from(table).select('*').eq('scheduled_date', date);
+      const movesRead = Moves ? Moves.forDate(client, date) : Promise.resolve([]);   // never fails
       let { data, error } = await run('isb_flights_view');
       if (error) {
         console.warn('isb_flights_view unavailable, using flights table', error);
         ({ data, error } = await run('flights'));
       }
       if (error) throw error;
+      const moves = await movesRead;
       if (token !== loadToken) return;      // the day was changed while loading
+      dayMoves  = moves;
       dayRows   = Array.isArray(data) ? data : [];
       loadedFor = date;
       render();
@@ -344,6 +349,9 @@ document.addEventListener('DOMContentLoaded', () => {
     card.href      = detailUrl(f.flight_number, state.date, f.type);
     card.dataset.flight = f.flight_number;
     card.dataset.type   = f.type || '';
+    // BL-050: a flight the board moved across midnight gets one explaining line
+    const moved  = Moves ? Moves.find(dayMoves, f.flight_number, f.type, state.date) : null;
+    const status = moved ? Moves.cardStatus(moved, f.status) : f.status;
 
     const logo = document.createElement('span');
     logo.className = 'fc-logo';
@@ -366,7 +374,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ${f.nature ? `<span class="flight-nature ${esc(String(f.nature).toLowerCase())}">${esc(f.nature)}</span>` : ''}
       </div>
       <div class="fc-times">ST ${esc(f.st || '—')} · ET ${esc(f.et || '—')} ·
-        <span class="status-pill ${statusClass(f.status)}">${esc(f.status || '—')}</span></div>`;
+        <span class="status-pill ${statusClass(status)}">${esc(status || '—')}</span></div>
+      ${moved ? `<div class="fc-moved">${Moves.cardLine(moved)}</div>` : ''}`;
 
     const chevron = document.createElement('span');
     chevron.className   = 'flight-card-chevron';

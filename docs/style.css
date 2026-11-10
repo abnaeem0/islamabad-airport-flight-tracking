@@ -1624,6 +1624,31 @@ a.flight-card:focus-visible {
 }
 .notice-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 
+/* Flight moved across midnight by the airport board (BL-050) */
+#move-notice {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: rgba(59,130,246,0.12);
+  border: 1px solid rgba(59,130,246,0.35);
+  color: #bfdbfe;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+#move-notice[hidden] { display: none; }
+#move-notice p { margin: 0; }
+#move-notice strong { color: #dbeafe; }
+.move-link { color: #93c5fd; text-decoration: underline; white-space: nowrap; }
+.move-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.fc-moved {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #93c5fd;
+  overflow-wrap: anywhere;
+}
+
 /* "Airport board" switch above the history (BL-038) */
 #board-switch {
   max-width: 868px;

@@ -14,14 +14,14 @@ For domestic flights landing in Islamabad, the details page also shows what the 
 
 | Layer | What | Where |
 |---|---|---|
-| Website | Static vanilla JS/CSS, no build step. Pages live in `docs/` (GitHub Pages). The contact page posts to a form service (Web3Forms, key placeholder in `contact.html` until set) | `docs/index.html`, `script.js`, `airlines.js` (shared airline names and FlightStats codes), `flight_detail.html`, `flight_detail.js`, `about.html`, `contact.html`, `style.css`, `sitemap.xml`, `logos/` |
+| Website | Static vanilla JS/CSS, no build step. Pages live in `docs/` (GitHub Pages). The contact page posts to a form service (Web3Forms, key placeholder in `contact.html` until set) | `docs/index.html`, `script.js`, `airlines.js` (shared airline names and FlightStats codes), `flight_moves.js` (flights moved across midnight, BL-050), `flight_detail.html`, `flight_detail.js`, `about.html`, `contact.html`, `style.css`, `sitemap.xml`, `logos/` |
 | Database | Supabase Postgres, free plan (23 MB on 2026-09-30). Browser reads directly with a publishable key | tables in section 4 |
 | Original collector | Islamabad only; yesterday, today, tomorrow; keeps 2 months | `scraper.py` -> `flights`, `flight_snapshots`, `scraper_status` |
 | New collector | 6 airports (Islamabad, Karachi, Lahore, Faisalabad, Multan, Peshawar); today and tomorrow; keeps 7 days; concurrent fetch, serial writes | `origin_scraper.py` -> `origin_flights`, `origin_snapshots`, `origin_scraper_status` |
 | Scheduler | Workflows `.github/workflows/scrape.yml` and `origin_scraper.yml` are **manual-trigger only** (cron blocks commented out). An external cron-job.org job dispatches them, reported by owner as every 15 minutes. Python 3.11, secrets `DB_HOST DB_NAME DB_USER DB_PASSWORD DB_PORT` | |
 | Source | `https://paaconnectapi.paa.gov.pk/api/flights/{date}/{Arrival|Departure}/{city}`, unofficial, TLS verification disabled in both collectors (BL-027) | |
 
-**Website reads the origin tables** through `isb_flights_view`, `isb_snapshots_view` and `isb_arrival_origin_view` (plus `origin_snapshots` for the "first seen departed" line), and falls back to the old `flights` / `flight_snapshots` tables if a view errors (BL-032). `flight_canonical_view` is not used by any page.
+**Website reads the origin tables** through `isb_flights_view`, `isb_snapshots_view`, `isb_arrival_origin_view` and `isb_flight_moves_view` (plus `origin_snapshots` for the "first seen departed" line), and falls back to the old `flights` / `flight_snapshots` tables if a view errors (BL-032). `flight_canonical_view` is not used by any page.
 Data flow: PAA API -> collector (flatten, normalise flight number, compare with stored row) -> upsert current row, insert snapshot on change -> a non-terminal flight missing from a non-empty feed becomes `Dropped` -> browser queries Supabase.
 
 ## 3. Conventions
@@ -48,6 +48,7 @@ Data flow: PAA API -> collector (flatten, normalise flight number, compare with 
 | `origin_scraper_status` | new health; row `scraper_id=paa_origin` |
 | `source_priority` | source registry; `data_source`, `priority`. Rows (2026-11-02): `paa` 10 (in use), `airline_web` 20 and `adsb` 30 (registered, no collector yet) |
 | `isb_arrival_origin_view` | applied 2026-11-04: pairs each Islamabad arrival with the departure leg from the origin airport (rules in PLAN.md section 5); not in the repo as a file, SQL is in PLAN.md |
+| `isb_flight_moves_view` | BL-050: links a flight the Islamabad board dropped after a delay past midnight to the next day's row that shows it; SQL and rule in `sql/isb_flight_moves_view.sql`, test cases in `tests/` |
 | `flight_canonical_view` | ranks sources, splits departure and arrival legs, `FULL JOIN` on number, origin city, destination city and date |
 
 Limits of the view: overnight flights (legs on different dates) do not pair; wrong-airport rows can multiply results; ties in priority are not resolved deterministically; international flights have no origin side. Do not "fix" it with an unrestricted +/-1 day join, which pairs daily flights wrongly (BL-019).

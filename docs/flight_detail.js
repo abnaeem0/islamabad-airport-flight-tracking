@@ -704,6 +704,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // ===== MOVED ACROSS MIDNIGHT (BL-050) =====
+  // One notice when the airport board moved this flight to the next day's list, or when this
+  // listing shows a flight moved here from the day before. Wording and the read live in
+  // flight_moves.js. No move, or any failed read, hides the notice; the page is otherwise unchanged.
+  const moveEl = document.getElementById('move-notice');
+
+  async function renderMoveNotice(flightType) {
+    const Moves = window.FlightMoves;
+    if (!moveEl || !Moves) return;
+    const link = Moves.find(await Moves.forDate(client, date), flightNumber, flightType, date);
+    let other = null;                          // where it went: its latest status there
+    if (link && link.side === 'from') {
+      try {
+        const { data } = await client.from('isb_flights_view').select('status,et')
+          .eq('flight_number', flightNumber).eq('scheduled_date', link.move.to_date)
+          .eq('type', flightType).limit(1);
+        other = Array.isArray(data) && data.length ? data[0] : null;
+      } catch (e) { /* the notice still shows, without the latest status */ }
+    }
+    const note = Moves.detailNotice(link, other);
+    if (!note) { moveEl.hidden = true; moveEl.innerHTML = ''; return; }
+    const href = `flight_detail.html?flight=${encodeURIComponent(flightNumber)}` +
+                 `&date=${encodeURIComponent(note.date)}&type=${encodeURIComponent(flightType)}`;
+    moveEl.innerHTML = `<p>${note.html} <a class="move-link" href="${href}">${note.linkText} ›</a></p>`;
+    moveEl.hidden = false;
+  }
+
   // ===== FETCH SCRAPER FRESHNESS =====
   async function fetchFreshness() {
     try {
@@ -789,6 +816,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       flightInfoDiv.insertAdjacentHTML('beforeend', checkLinksHtml(snapshots));
       renderNotice(latest);
       renderBoard();
+      await renderMoveNotice(first.type);
 
     } catch (err) {
       console.error(err);
