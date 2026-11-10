@@ -5,7 +5,7 @@
 min_refetch_minutes = 15        # never fetch the same page twice within this
 gap_seconds = [2, 5]            # random pause between two requests
 max_requests_per_run = 6        # hard stop for one run
-daily_cap = 60                  # per source, per Pakistan day; total target under ~100 a day
+daily_cap = 30                  # per source, per Pakistan day, unless the source sets its own
 pause_on_block = true           # a 403/429/check page pauses that source until the next Pakistan day
 max_lateness = 45               # a checkpoint missed by more than this is skipped, not caught up
 user_agent = "IslamabadFlightTracker/1.0 (+https://abnaeem0.github.io/islamabad-airport-flight-tracking/)"
@@ -34,10 +34,12 @@ daily_cap = 24
 [source.pia_route]              # one page = every PIA flight on one route that day (Islamabad arrivals)
 enabled = true
 airline = "PK"
+daily_cap = 40
 
 [source.flyjinnah_route]        # one page = every Fly Jinnah flight on one route that day (both directions)
 enabled = true
 airline = "9P"
+daily_cap = 30                  # caps add up to 94 requests a day at most
 
 # Airblue is not collected: its pages show automated clients a check page. Switch on only with
 # Airblue's permission, in whatever form they allow (BL-053).

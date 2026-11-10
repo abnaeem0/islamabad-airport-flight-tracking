@@ -19,8 +19,6 @@ on:
         type: choice
         options: [dry-run, no-write, live]
         default: dry-run
-  push:
-    branches: [bl-051-airline-collector]   # TEMPORARY: no-write test on the PR branch; remove before merge
 
 concurrency:
   group: airline-collector
@@ -61,20 +59,12 @@ jobs:
         run: |
           case "$EVENT" in
             workflow_dispatch) MODE="$MODE_INPUT" ;;
-            push)              MODE="dry-run" ;;
             *)                 MODE="live" ;;
           esac
           echo "Mode: $MODE"
           case "$MODE" in
             dry-run)  python airline_collector.py --dry-run ;;
-            no-write)
-              if [ "$EVENT" = "push" ]; then
-                T=$(TZ=Asia/Karachi date +%F)
-                python airline_collector.py --no-write \
-                  --page pia_departures "ISB departures $T" --page flyjinnah_route "KHI-ISB $T"
-              else
-                python airline_collector.py --no-write
-              fi ;;
+            no-write) python airline_collector.py --no-write ;;
             live)     python airline_collector.py ;;
             *)        echo "::error::Unknown mode $MODE"; exit 1 ;;
           esac

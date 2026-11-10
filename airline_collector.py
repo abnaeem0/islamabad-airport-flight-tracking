@@ -22,6 +22,7 @@ Airblue is not here on purpose: its pages show automated clients a check page (B
     python airline_collector.py               # live: fetch and write
 
 Environment: DB_HOST DB_NAME DB_USER DB_PASSWORD DB_PORT (the same secrets as the other collectors).
+The first live run creates its two tables (SCHEMA below); --dry-run and --no-write never write.
 """
 import argparse
 import dataclasses
@@ -628,6 +629,55 @@ def read_state(conn, cur, airlines, today):
     return flights, held, log_rows, tables_ready
 
 
+# Created by the first live run, like the AeroDataBox collector's tables (safe to repeat). Private:
+# row-level security on with no policies, so the site's browser key gets nothing.
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS public.airline_legs (
+  flight_number text        NOT NULL,          -- PK942, 9P670
+  dep_date      date        NOT NULL,          -- scheduled departure date, local to the origin
+  origin        text        NOT NULL,          -- IATA code
+  destination   text        NOT NULL,
+  airline       text        NOT NULL,          -- PK, 9P
+  sched_dep     timestamptz,
+  est_dep       timestamptz,
+  act_dep       timestamptz,
+  sched_arr     timestamptz,
+  est_arr       timestamptz,
+  act_arr       timestamptz,
+  wheels_off    timestamptz,                   -- Fly Jinnah only
+  wheels_on     timestamptz,
+  status_raw    text,                          -- the airline's own word (PIA's is not reliable)
+  source        text        NOT NULL,          -- pia_departures, pia_route, flyjinnah_route
+  data_source   text        NOT NULL DEFAULT 'airline_web',
+  raw           jsonb,
+  first_seen    timestamptz NOT NULL DEFAULT now(),
+  fetched_at    timestamptz NOT NULL,
+  PRIMARY KEY (flight_number, dep_date, origin)
+);
+
+CREATE TABLE IF NOT EXISTS public.airline_fetch_log (
+  id             bigserial   PRIMARY KEY,
+  at             timestamptz NOT NULL DEFAULT now(),
+  source         text        NOT NULL,
+  target         text        NOT NULL,         -- 'KHI-ISB 2026-11-11', 'ISB departures 2026-11-11'
+  reason         text,                         -- timer, gap, fallback, sweep, manual
+  http_status    integer,
+  outcome        text        NOT NULL,         -- ok, empty, blocked, error, parse_fail, skipped_paused, skipped_cap
+  flights_parsed integer,
+  missing        text[],                       -- flights wanted but not on the page
+  ms             integer,
+  note           text
+);
+CREATE INDEX IF NOT EXISTS airline_fetch_log_at_idx ON public.airline_fetch_log (at);
+
+-- Not for the public site: no policies, so the browser key gets nothing.
+ALTER TABLE public.airline_legs      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.airline_fetch_log ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.airline_legs, public.airline_fetch_log FROM anon, authenticated;
+REVOKE ALL ON SEQUENCE public.airline_fetch_log_id_seq FROM anon, authenticated;
+"""
+
+
 UPSERT = """
 INSERT INTO public.airline_legs (flight_number, dep_date, origin, destination, airline,
     sched_dep, est_dep, act_dep, sched_arr, est_arr, act_arr, wheels_off, wheels_on,
@@ -688,6 +738,9 @@ def main(argv=None):
 
     airlines = sorted({s["airline"] for s in cfg["source"].values() if s.get("enabled")})
     conn, cur = connect()
+    if not (args.dry_run or args.no_write):
+        cur.execute(SCHEMA)
+        conn.commit()
     flights, held, log_rows, tables_ready = read_state(conn, cur, airlines, today)
     print(f"Airport data: {len(flights)} {'/'.join(airlines)} rows at Islamabad (yesterday to tomorrow); "
           f"airline legs held: {sum(map(len, held.values()))}; fetch log rows (2 days): {len(log_rows)}")
@@ -697,9 +750,9 @@ def main(argv=None):
         print(f"  newest airport update {fmt(newest)} PKT; today's rows without ET: {no_et} of "
               f"{sum(1 for f in flights if f.date == today)}")
     if not tables_ready:
-        print("Tables airline_legs / airline_fetch_log do not exist yet (BL-051 SQL not applied).")
+        print("Tables airline_legs / airline_fetch_log do not exist yet (the first live run creates them).")
         if not (args.dry_run or args.no_write):
-            print("Live mode needs them. Apply the SQL in PLAN.md (BL-051) first.")
+            print("Live mode could not create them.")
             return 2
 
     pages, skipped, notes, stale = plan(flights, held, log_rows, now, cfg)

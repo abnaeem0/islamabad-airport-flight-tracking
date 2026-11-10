@@ -326,7 +326,7 @@ class FakeCur:
         self.sql = []
 
     def execute(self, sql, params=None):
-        self.sql.append((" ".join(sql.split())[:40], params))
+        self.sql.append((" ".join(sql.split())[:60], params))
 
 
 class FakeConn:
@@ -381,6 +381,7 @@ def test_full_run_no_write_and_live():
     assert cur.sql == [] and not hasattr(conn, "committed")
 
     rc, sent, cur, conn = _fake_run([], flights, {}, [], answers, now)
+    assert cur.sql[0][0].startswith("CREATE TABLE IF NOT EXISTS public.airline_legs")   # live run sets up first
     upserts = [p for s, p in cur.sql if s.startswith("INSERT INTO public.airline_legs")]
     logs = [p for s, p in cur.sql if s.startswith("INSERT INTO public.airline_fetch_log")]
     assert rc == 0 and conn.committed and len(logs) == len(sent)
@@ -399,8 +400,11 @@ def test_manual_page_only_without_writes():
     rc, sent, cur, _ = _fake_run(["--no-write", "--page", "flyjinnah_route", "KHI-ISB 2026-11-07"],
                                  [], {}, [], answers, pkt(D, "09:30"))
     assert rc == 0 and sent == ["KHI-ISB 2026-11-07"] and cur.sql == []
+    import contextlib
+    import io
     try:
-        ac.main(["--page", "flyjinnah_route", "KHI-ISB 2026-11-07"])
+        with contextlib.redirect_stderr(io.StringIO()):     # argparse's expected complaint
+            ac.main(["--page", "flyjinnah_route", "KHI-ISB 2026-11-07"])
     except SystemExit as e:
         assert e.code == 2
     else:
