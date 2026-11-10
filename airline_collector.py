@@ -316,6 +316,7 @@ def plan(flights, held_legs, log_rows, now, cfg):
         notes.append("airport data is stale: fallback mode")
 
     last_fetch = {}                       # (source, target) -> latest fetch time
+    last_outcome = {}                     # (source, target) -> outcome of that latest fetch
     used_today = defaultdict(int)
     paused = set()
     today = now.astimezone(PKT).date()
@@ -325,6 +326,7 @@ def plan(flights, held_legs, log_rows, now, cfg):
             continue
         key = (r["source"], r["target"])
         last_fetch[key] = max(last_fetch.get(key, r["at"]), r["at"])
+        last_outcome[key] = r["outcome"]              # rows are in time order, so the latest wins
         if r["at"].astimezone(PKT).date() == today:
             used_today[r["source"]] += 1
             if r["outcome"] == "blocked" and cfg["defaults"]["pause_on_block"]:
@@ -345,6 +347,8 @@ def plan(flights, held_legs, log_rows, now, cfg):
         last = last_fetch.get((page.source, page.target))
         if last is None:
             return False
+        if last_outcome.get((page.source, page.target)) == "empty":
+            return True       # the airline lists nothing for that route and date; asking again won't help
         if last >= since:
             return True
         gap = route_every if (stale and page.source != "pia_departures") else min_refetch
@@ -392,7 +396,7 @@ def plan(flights, held_legs, log_rows, now, cfg):
     if now >= sweep_start and not swept:
         yday = today - dt.timedelta(days=1)
         for r in log_rows:
-            if r["outcome"] not in ("ok", "empty") or not r["target"].endswith(yday.isoformat()):
+            if r["outcome"] != "ok" or not r["target"].endswith(yday.isoformat()):
                 continue
             if r["source"] not in enabled:
                 continue

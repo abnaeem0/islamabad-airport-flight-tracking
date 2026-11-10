@@ -233,6 +233,17 @@ def test_finished_flight_and_daily_flight_numbers():
     assert len(run_plan([a], now, held={("PK300", "Arrival"): [yesterday]})[0]) == 1
 
 
+def test_empty_page_not_asked_again():
+    f = flight("9P711", "Arrival", "Dammam", "05:00", "05:00", "Expected")     # international, nothing held
+    now = pkt(D, "01:10")
+    pages = run_plan([f], now)[0]
+    assert pages and all(p[0] == "flyjinnah_route" for p in pages)
+    empties = [log(pkt(D, "00:50"), p[0], p[1], outcome="empty") for p in pages]
+    assert run_plan([f], pkt(D, "05:15"), logs=empties)[0] == []           # later checkpoint, same answer
+    errors = [log(pkt(D, "00:50"), p[0], p[1], outcome="error") for p in pages]
+    assert len(run_plan([f], pkt(D, "05:15"), logs=errors)[0]) == len(pages)   # an error is retried
+
+
 def test_departures_board_on_timer():
     d = flight("PK301", "Departure", "Karachi", "10:00", "10:00")
     pages = run_plan([d], pkt(D, "09:00"))[0]
@@ -292,7 +303,8 @@ def test_three_errors_rest_two_hours():
 
 def test_morning_sweep_once():
     y = D - dt.timedelta(days=1)
-    yday = [log(pkt(y, "20:00"), "flyjinnah_route", f"KHI-ISB {y}"),
+    yday = [log(pkt(y, "19:00"), "pia_route", f"DMM-ISB {y}", outcome="empty"),
+            log(pkt(y, "20:00"), "flyjinnah_route", f"KHI-ISB {y}"),
             log(pkt(y, "21:00"), "pia_departures", f"ISB departures {y}", reason="timer"),
             log(pkt(y, "21:30"), "pia_route", f"JED-ISB {y}", outcome="blocked")]
     assert run_plan([], pkt(D, "04:20"), logs=yday)[0] == []
