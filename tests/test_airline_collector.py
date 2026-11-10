@@ -363,7 +363,10 @@ def _fake_run(monkey_args, flights, held, logs, answers, now_pkt):
         ac.read_state = lambda *a: (flights, held, logs, True)
         ac.Fetcher.get = fake_get
         ac.dt = DtModule
-        rc = ac.main(monkey_args)
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):     # keep '::error::' lines out of the Actions log
+            rc = ac.main(monkey_args)
     finally:
         ac.connect, ac.read_state, ac.Fetcher.get, ac.dt = saved
     return rc, sent, cur, conn
