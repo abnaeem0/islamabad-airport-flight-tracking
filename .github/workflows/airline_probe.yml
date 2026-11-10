@@ -1,0 +1,52 @@
+# .github/workflows/airline_probe.yml
+#
+# TEMPORARY test for BL-051 checkpoint 2: do PIA and Fly Jinnah answer
+# plain requests from a GitHub runner? Runs only on a push to the test
+# branch probe/airline-actions. No secrets, no database: it prints what
+# it parsed and uploads the raw pages as an artifact. Not for main.
+
+name: Airline probe (test, no database)
+
+on:
+  push:
+    branches: [probe/airline-actions]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Where this runner is (country / network)
+        run: curl -s --max-time 10 https://ipinfo.io/json | python -c "import sys,json; d=json.load(sys.stdin); print(d.get('country'), d.get('region'), d.get('org'))" || true
+
+      - name: Probe PIA and Fly Jinnah (about 7 requests, 2 s apart)
+        run: python -X utf8 airline_probe.py pia flyjinnah > probe_flights.jsonl
+
+      - name: Show parsed flights
+        if: always()
+        run: cat probe_flights.jsonl || true
+
+      - name: Keep raw pages
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: probe-output
+          path: |
+            probe_flights.jsonl
+            probe_out/
+          retention-days: 3
