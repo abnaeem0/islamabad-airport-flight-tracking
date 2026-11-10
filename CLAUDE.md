@@ -19,6 +19,7 @@ For domestic flights landing in Islamabad, the details page also shows what the 
 | Original collector | Islamabad only; yesterday, today, tomorrow; keeps 2 months | `scraper.py` -> `flights`, `flight_snapshots`, `scraper_status` |
 | New collector | 6 airports (Islamabad, Karachi, Lahore, Faisalabad, Multan, Peshawar); today and tomorrow; keeps 7 days; concurrent fetch, serial writes | `origin_scraper.py` -> `origin_flights`, `origin_snapshots`, `origin_scraper_status` |
 | Scheduler | Workflows `.github/workflows/scrape.yml` and `origin_scraper.yml` are **manual-trigger only** (cron blocks commented out). An external cron-job.org job dispatches them, reported by owner as every 15 minutes. Python 3.11, secrets `DB_HOST DB_NAME DB_USER DB_PASSWORD DB_PORT` | |
+| AeroDataBox collector | Origin side of Islamabad arrivals from AeroDataBox (free plan, non-commercial, credit required). Workflow starts after every Origin Scraper run; calls only in 4 daily slots (about 8 of 400 monthly units). Own tables only, kept 7 days. Secret `AERODATABOX_KEY` (BL-040) | `aerodatabox_collector.py` -> `adb_arrivals`, `adb_runs`; `.github/workflows/aerodatabox_collector.yml` |
 | Probes | `.github/workflows/aerodatabox_probe.yml` (manual, read-only) runs `probes/aerodatabox_probe.py` with secret `AERODATABOX_KEY` (BL-040). Writes nothing to the database | `probes/` |
 | Source | `https://paaconnectapi.paa.gov.pk/api/flights/{date}/{Arrival|Departure}/{city}`, unofficial, TLS verification disabled in both collectors (BL-027) | |
 
@@ -49,6 +50,8 @@ Data flow: PAA API -> collector (flatten, normalise flight number, compare with 
 | `origin_scraper_status` | new health; row `scraper_id=paa_origin` |
 | `source_priority` | source registry; `data_source`, `priority`. Rows (2026-11-02): `paa` 10 (in use), `airline_web` 20 and `adsb` 30 (registered, no collector yet) |
 | `isb_arrival_origin_view` | applied 2026-11-04: pairs each Islamabad arrival with the departure leg from the origin airport (rules in PLAN.md section 5); not in the repo as a file, SQL is in PLAN.md |
+| `adb_arrivals` | AeroDataBox origin leg per Islamabad arrival (BL-040); PK flight number + scheduled arrival (UTC); rows deleted after 7 days; RLS on, not read by the site yet |
+| `adb_runs` | one row per AeroDataBox call: slot, window, HTTP status, counts, comparison with PAA, units left; kept |
 | `flight_canonical_view` | ranks sources, splits departure and arrival legs, `FULL JOIN` on number, origin city, destination city and date |
 
 Limits of the view: overnight flights (legs on different dates) do not pair; wrong-airport rows can multiply results; ties in priority are not resolved deterministically; international flights have no origin side. Do not "fix" it with an unrestricted +/-1 day join, which pairs daily flights wrongly (BL-019).

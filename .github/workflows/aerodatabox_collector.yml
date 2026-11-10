@@ -1,0 +1,49 @@
+# .github/workflows/aerodatabox_collector.yml
+#
+# BL-040: collects the origin side of Islamabad arrivals from AeroDataBox (free plan).
+# Starts after every Origin Scraper run (no cron of its own). Most runs exit in seconds:
+# aerodatabox_collector.py calls AeroDataBox only in four daily slots (about 8 units a day).
+# Writes only adb_arrivals and adb_runs. Needs AERODATABOX_KEY and the usual DB secrets.
+# A failure here never affects the Origin Scraper.
+
+name: AeroDataBox collector
+
+on:
+  workflow_run:
+    workflows: ["Origin Scraper"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aerodatabox-collector
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary
+
+      - name: Collect (only when a slot is due)
+        env:
+          AERODATABOX_KEY: ${{ secrets.AERODATABOX_KEY }}
+          DB_HOST:         ${{ secrets.DB_HOST }}
+          DB_NAME:         ${{ secrets.DB_NAME }}
+          DB_USER:         ${{ secrets.DB_USER }}
+          DB_PASSWORD:     ${{ secrets.DB_PASSWORD }}
+          DB_PORT:         ${{ secrets.DB_PORT }}
+        run: python aerodatabox_collector.py
