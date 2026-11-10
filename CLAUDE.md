@@ -19,6 +19,7 @@ For domestic flights landing in Islamabad, the details page also shows what the 
 | Original collector | Islamabad only; yesterday, today, tomorrow; keeps 2 months | `scraper.py` -> `flights`, `flight_snapshots`, `scraper_status` |
 | New collector | 6 airports (Islamabad, Karachi, Lahore, Faisalabad, Multan, Peshawar); today and tomorrow; keeps 7 days; concurrent fetch, serial writes | `origin_scraper.py` -> `origin_flights`, `origin_snapshots`, `origin_scraper_status` |
 | Scheduler | Workflows `.github/workflows/scrape.yml` and `origin_scraper.yml` are **manual-trigger only** (cron blocks commented out). An external cron-job.org job dispatches them, reported by owner as every 15 minutes. Python 3.11, secrets `DB_HOST DB_NAME DB_USER DB_PASSWORD DB_PORT` | |
+| Probes | `.github/workflows/aerodatabox_probe.yml` (manual, read-only) runs `probes/aerodatabox_probe.py` with secret `AERODATABOX_KEY` (BL-040). Writes nothing to the database | `probes/` |
 | Source | `https://paaconnectapi.paa.gov.pk/api/flights/{date}/{Arrival|Departure}/{city}`, unofficial, TLS verification disabled in both collectors (BL-027) | |
 
 **Website reads the origin tables** through `isb_flights_view`, `isb_snapshots_view` and `isb_arrival_origin_view` (plus `origin_snapshots` for the "first seen departed" line), and falls back to the old `flights` / `flight_snapshots` tables if a view errors (BL-032). `flight_canonical_view` is not used by any page.

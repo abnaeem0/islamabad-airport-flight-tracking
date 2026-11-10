@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# local AeroDataBox probe answers (BL-040)
+aerodatabox_probe_output/

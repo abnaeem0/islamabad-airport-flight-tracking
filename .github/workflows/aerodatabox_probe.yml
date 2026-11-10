@@ -1,0 +1,58 @@
+# .github/workflows/aerodatabox_probe.yml
+#
+# BL-040: one-off, read-only test of AeroDataBox's free plan (about 8 of 400 monthly units).
+# Manual trigger only. Needs the repository secret AERODATABOX_KEY (RapidAPI key).
+# Writes nothing to the database. The summary appears on the run page; the raw answers are
+# kept 7 days as a run artifact (AeroDataBox allows keeping its data 7 days).
+
+name: AeroDataBox probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Pakistan date YYYY-MM-DD (leave blank for yesterday)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run probe
+        env:
+          AERODATABOX_KEY: ${{ secrets.AERODATABOX_KEY }}
+          PROBE_DATE: ${{ inputs.date }}
+        run: |
+          if [ -z "$AERODATABOX_KEY" ]; then
+            echo "::error::Add the repository secret AERODATABOX_KEY first (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          D="${PROBE_DATE:-$(TZ=Asia/Karachi date -d yesterday +%F)}"
+          if ! echo "$D" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+            echo "::error::Date must look like 2026-11-10"; exit 1
+          fi
+          python probes/aerodatabox_probe.py --date "$D" --yes
+          { echo '```'; cat aerodatabox_probe_output/summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep raw answers (7 days)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerodatabox-probe
+          path: aerodatabox_probe_output/
+          retention-days: 7
+          if-no-files-found: ignore
