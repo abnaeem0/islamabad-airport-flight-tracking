@@ -336,6 +336,9 @@ def main():
                            only_paa=",".join(sorted(paa - adb)) or None)
             log(f"   {rows} arrivals stored, {with_origin} with origin schedule, {with_actual} with actual times; "
                 f"PAA {rec['paa_arrivals']}, matched {rec['matched']}; units left {units}")
+            if rec["only_paa"] or rec["only_adb"]:
+                log(f"   only on PAA's board: {rec['only_paa'] or '-'}")
+                log(f"   only in AeroDataBox: {rec['only_adb'] or '-'}")
         else:
             msg = (data or {}).get("message") if isinstance(data, dict) else None
             rec["error"] = (msg or f"HTTP {status}")[:300]
