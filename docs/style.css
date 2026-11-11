@@ -1075,94 +1075,40 @@ a.flight-card:focus-visible {
   box-shadow:   0 0 0 3px var(--accent-glow);
 }
 
-/* --- Departure day for the FlightStats link (BL-039) --- */
-.day-credit, .check-credit {
-  margin:    0.35rem 0 0;
-  font-size: 0.72rem;
-  color:     var(--text-muted);
+/* --- Note under the "Check it yourself" chips (BL-040, BL-054) --- */
+.check-credit {
+  margin:     0.35rem 0 0;
+  flex-basis: 100%;
+  font-size:  0.72rem;
+  color:      var(--text-muted);
 }
-.day-credit a, .check-credit a { color: var(--accent-2); }
-.check-credit { flex-basis: 100%; }
-#share-day[hidden] { display: none; }
-.day-sure {
-  display:         flex;
-  align-items:     center;
-  justify-content: space-between;
-  gap:             0.75rem;
-  padding:         0.65rem 0.8rem;
-  background:      var(--surface-2);
-  border:          1px solid var(--border);
-  border-radius:   var(--radius-sm);
-  font-size:       0.85rem;
-  color:           var(--text);
+.check-credit a { color: var(--accent-2); }
+
+/* --- Booking reference, for the sender's own copy (BL-054) --- */
+#share-pnr-label {
+  font-size:      0.72rem;
+  font-weight:    600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color:          var(--text-muted);
+  margin-bottom:  -0.6rem;
 }
-.day-change {
-  background:  none;
-  border:      none;
-  color:       var(--accent-2);
-  font:        inherit;
-  font-size:   0.82rem;
-  cursor:      pointer;
-  padding:     0.2rem 0;
-  white-space: nowrap;
-  text-decoration: underline;
+#share-pnr-label span { font-weight: 400; text-transform: none; letter-spacing: 0; }
+#share-pnr {
+  background:     var(--surface-2);
+  border:         1px solid var(--border);
+  border-radius:  var(--radius-sm);
+  padding:        0.65rem 0.9rem;
+  font-family:    'JetBrains Mono', monospace;
+  font-size:      0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color:          var(--text);
+  width:          100%;
+  box-sizing:     border-box;
+  outline:        none;
 }
-.day-q {
-  margin:        0;
-  padding:       0.85rem 0.9rem 0.8rem;
-  border:        1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  min-width:     0;
-}
-.day-q legend {
-  padding:     0 0.35rem;
-  margin-left: -0.35rem;
-  font-size:   0.95rem;
-  font-weight: 600;
-  color:       var(--text);
-}
-.day-sub, .day-check {
-  margin:      0.2rem 0 0;
-  font-size:   0.8rem;
-  line-height: 1.5;
-  color:       var(--text-muted);
-}
-.day-check { margin-top: 0.6rem; }
-.day-opts {
-  display:               grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap:                   0.55rem;
-  margin-top:            0.7rem;
-}
-.day-opt {
-  border:        1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding:       0.55rem 0.65rem 0.5rem;
-  background:    var(--surface-2);
-  min-width:     0;
-}
-.day-opt.is-on {
-  border-color: var(--accent);
-  box-shadow:   0 0 0 1px var(--accent);
-}
-.day-opt label {
-  display:               grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap:            0.45rem;
-  cursor:                pointer;
-}
-.day-opt input { grid-row: 1 / span 2; margin: 0.2rem 0 0; accent-color: var(--accent); }
-.day-opt-title { font-size: 0.92rem; font-weight: 600; color: var(--text); }
-.day-opt-date  { font-size: 0.75rem; color: var(--text-muted); }
-.day-opt.is-on .day-opt-date { color: var(--accent-2); }
-.day-opt a {
-  display:         inline-block;
-  margin-top:      0.35rem;
-  font-size:       0.78rem;
-  color:           var(--accent-2);
-  text-decoration: none;
-}
-.day-opt a:hover { text-decoration: underline; }
+#share-pnr:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
 
 /* --- Actions area --- */
 #share-actions {
@@ -1716,3 +1662,4 @@ a.flight-card:focus-visible {
   #snapshot-table th:nth-child(3) { width: 23%; }
   #snapshot-table th:nth-child(4) { width: 28%; }
 }
+

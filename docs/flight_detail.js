@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Islamabad scheduled arrival minus the typical flight time, read as a date in the origin's
   // time zone. A wrong link costs trust, so if there is any doubt (the estimate lands within
   // NEAR_MIDNIGHT minutes of midnight at the origin, the city is unknown or the time is missing)
-  // the share box asks the sender which day it took off, with our guess preselected.
+  // the "Check it yourself" row offers both days, our guess first (BL-054).
   //
   // Origin city (as Islamabad's board writes it; case, spaces and punctuation ignored):
   //   [time zone, typical scheduled flight minutes to Islamabad]
@@ -251,11 +251,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           <button id="share-modal-close" aria-label="Close">&times;</button>
         </div>
 
-        <!-- Departure day for the FlightStats link (arrivals only, BL-039) -->
-        <div id="share-day" hidden></div>
-
         <label id="share-text-label" for="share-text">Message (you can edit it)</label>
-        <textarea id="share-text" rows="11" spellcheck="false"></textarea>
+        <textarea id="share-text" rows="7" spellcheck="false"></textarea>
+        <label id="share-pnr-label" for="share-pnr">Booking reference (PNR), for your own reference <span>optional</span></label>
+        <input id="share-pnr" type="text" maxlength="12" autocapitalize="characters" spellcheck="false" placeholder="e.g. 5XK2LM" autocomplete="off">
 
         <div id="share-actions">
           <div id="share-btn-row">
@@ -300,6 +299,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
+    // Booking reference: one line under the status line, swapped as it is typed (sender's edits kept)
+    document.getElementById('share-pnr').addEventListener('input', e => setPnrLine(e.target.value));
+
     // Share button: the phone's own share sheet, shown only where the browser has one
     const nativeBtn = document.getElementById('share-native-btn');
     if (navigator.share) {
@@ -319,20 +321,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.open(`https://wa.me/${number}?text=${encodeURIComponent(messageText())}`, '_blank');
     });
 
-    // Picking a day swaps the FlightStats link inside the message, keeping the sender's edits
-    document.getElementById('share-day').addEventListener('change', e => {
-      if (e.target.name !== 'share-day') return;
-      setShareDay(e.target.value);
-    });
-    document.getElementById('share-day').addEventListener('click', e => {
-      if (e.target.closest('.day-change')) renderDayQuestion();
-    });
+  }
+
+  let pnrLine = '';   // the booking-reference line currently in the message ('' = none)
+  function setPnrLine(raw) {
+    const ta  = document.getElementById('share-text');
+    const v   = String(raw || '').replace(/\s+/g, '').toUpperCase();
+    const nxt = v ? `Booking ref (PNR): ${v}` : '';
+    let lines = ta.value.split('\n');
+    if (pnrLine) lines = lines.filter(l => l !== pnrLine);
+    if (nxt) {
+      const i = lines.findIndex(l => l.startsWith('Airport status:'));
+      lines.splice(i >= 0 ? i + 1 : 1, 0, nxt);
+    }
+    ta.value = lines.join('\n');
+    pnrLine  = nxt;
   }
 
   // ----- Departure day (arrivals) -----
-  let shareCtx = null;   // { flight, fsUrlFor, fsUrl, arrDate, origin, guess, sure, chosen }
-
-  // Our answer for which day an arrival took off: departure board > correction/estimate
   // Which day the arrival left its origin (FlightStats files flights by that day):
   //   departure board (domestic, matched) > AeroDataBox origin leg (BL-040) > estimate.
   // source: 'board' | 'adb' | 'estimate'
@@ -351,78 +357,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     return { guess: est.date, sure: est.sure, source: 'estimate' };
   }
 
-  function renderDaySure() {
-    const box = document.getElementById('share-day');
-    const from = shareCtx.origin ? ` leaving ${esc(shareCtx.origin)}` : '';
-    box.innerHTML = `
-      <div class="day-sure">
-        <span class="day-sure-text">🛫 FlightStats: flight${from} on ${esc(dayLabel(shareCtx.chosen))}</span>
-        <button type="button" class="day-change">Change</button>
-      </div>${shareCtx.source === 'adb' && shareCtx.chosen === shareCtx.guess
-        ? '<p class="day-credit">Departure day from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></p>' : ''}`;
-  }
-
-  function renderDayQuestion() {
-    const box  = document.getElementById('share-day');
-    const prev = dayBefore(date);
-    const opt  = iso => {
-      const on = shareCtx.chosen === iso;
-      return `
-        <div class="day-opt${on ? ' is-on' : ''}">
-          <label>
-            <input type="radio" name="share-day" value="${iso}"${on ? ' checked' : ''}>
-            <span class="day-opt-title">${esc(dayLabel(iso))}</span>
-            <span class="day-opt-date">${shareCtx.guess === iso ? 'best guess' : '&nbsp;'}</span>
-          </label>
-          <a href="${esc(shareCtx.fsUrlFor(iso))}" target="_blank" rel="noopener">Check ↗</a>
-        </div>`;
-    };
-    const where = shareCtx.origin ? ` ${esc(shareCtx.origin)}` : '';
-    box.innerHTML = `
-      <fieldset class="day-q">
-        <legend>Which day does it leave${where}?</legend>
-        ${shareCtx.guess ? '' : '<p class="day-sub">We couldn’t work it out, so please pick one.</p>'}
-        <div class="day-opts">
-          ${opt(prev)}
-          ${opt(date)}
-        </div>
-        <p class="day-check">FlightStats lists flights by the day they leave. The right one lands in Islamabad on ${esc(dayLabel(date))}.</p>
-      </fieldset>`;
-  }
-
-  function setShareDay(iso) {
-    const ta  = document.getElementById('share-text');
-    const url = shareCtx.fsUrlFor(iso);
-    ta.value = ta.value.split(shareCtx.fsUrl).join(url);
-    shareCtx.fsUrl  = url;
-    shareCtx.chosen = iso;
-    document.querySelectorAll('#share-day .day-opt').forEach(o => {
-      o.classList.toggle('is-on', o.querySelector('input').value === iso);
-    });
-  }
-
   function openShareModal(snapshots) {
-    const latest    = snapshots[snapshots.length - 1];
-    const isArrival = (latest.type || '').toLowerCase() === 'arrival';
-    const fsUrlFor  = fsLinkMaker();
-    const box       = document.getElementById('share-day');
-
-    let fsDate = date;   // departures: Islamabad's date is the departure date
-    if (isArrival && fsUrlFor(date)) {   // no question when there is no FlightStats link at all
-      const d = departureDay(snapshots);
-      fsDate = d.guess;
-      const origin = latest.city && latest.city !== '—' ? latest.city : '';
-      shareCtx = { fsUrlFor, fsUrl: fsUrlFor(fsDate), arrDate: date, origin,
-                   guess: d.guess, sure: d.sure, chosen: d.guess, source: d.source };
-      box.hidden = false;
-      if (d.sure) renderDaySure(); else renderDayQuestion();
-    } else {
-      shareCtx = null;
-      box.hidden = true;
-      box.innerHTML = '';
-    }
-
-    document.getElementById('share-text').value = buildShareText(snapshots, fsUrlFor(fsDate));
+    pnrLine = '';
+    document.getElementById('share-pnr').value = '';
+    document.getElementById('share-text').value = buildShareText(snapshots);
     document.getElementById('share-modal').classList.add('share-modal--open');
     document.body.style.overflow = 'hidden';
   }
@@ -446,46 +384,47 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Build the share message text from current page state
-  function buildShareText(snapshots, fsUrl) {
-    const latest  = snapshots[snapshots.length - 1];
-    const airline = getAirlineInfo(flightNumber);
-
-    const city      = latest.city || '—';
+  // Share message (BL-054): one plain sentence that makes sense offline, the airport's status with
+  // the time we last checked, our link, and the airline helpline. FlightStats is not in the message:
+  // the page offers it ("Check it yourself"), and asks for the day there when we are not sure.
+  function buildShareText(snapshots) {
+    const latest    = snapshots[snapshots.length - 1];
+    const airline   = getAirlineInfo(flightNumber);
+    const named     = airline.name && airline.name !== 'Airline';
+    const who       = `${named ? airline.name + ' flight' : 'Flight'} ${flightNumber}`;
+    const city      = latest.city && latest.city !== '—' ? latest.city : '';
     const isArrival = (latest.type || '').toLowerCase() === 'arrival';
-    const route     = isArrival ? `${city} → Islamabad` : `Islamabad → ${city}`;
+    const day       = dayLabel(date);
+    const st = (latest.st || '').trim(), et = (latest.et || '').trim();
+    const status = String(latest.status || '').trim();
+    const tone   = statusTone(status);
+    const d      = et && et !== st ? minutesDiff(st, et) : null;
+    const asOf   = clockPKT(lastScrapeTime || latest.scraped_at);
+    const verb   = isArrival ? 'land at' : 'leave';
+    const leg    = isArrival ? `${who}${city ? ` from ${city}` : ''}` : `${who}${city ? ` to ${city}` : ''}`;
+    const route  = isArrival ? `${who}${city ? ` from ${city}` : ''} to Islamabad` : `${who} from Islamabad${city ? ` to ${city}` : ''}`;
 
-    const when    = latest.st ? `${latest.st} (${date})` : '—';
-    const status  = latest.status || '—';
-    const lastUpd = lastScrapeTime ? formatPKT(lastScrapeTime) : formatPKT(latest.scraped_at);
-
-    const pageUrl = window.location.href;
-
+    let sentence;
+    if (tone === 'bad') {
+      sentence = `${route} on ${day} is cancelled.`;
+    } else if (tone === 'muted') {
+      sentence = `${route} on ${day} is no longer on the airport board. Please check with the airline.`;
+    } else if (isArrival && tone === 'good') {
+      sentence = `${leg} has landed at Islamabad airport (${day}).`;
+    } else if (!isArrival && /depart|airborne|take/i.test(status)) {
+      sentence = `${leg} has left Islamabad airport (${day}).`;
+    } else if (d) {
+      sentence = `${leg} is now expected to ${verb} Islamabad airport at ${et} on ${day}, ${diffText(d)} (scheduled ${st}).`;
+    } else {
+      sentence = `${leg} is due to ${verb} Islamabad airport at ${st || '—'} on ${day}.`;
+    }
     const lines = [
-      `✈️ Flight Update`,
-      `Flight: ${flightNumber}`,
-      `Route: ${route}`,
-      `⏰ ${isArrival ? 'Arrival' : 'Departure'}: ${when}`,
-      `📊 Status: ${status}`,
-      `🕒 Last scraped: ${lastUpd} PKT`,
-      `────────────────`,
+      `✈️ ${sentence}`,
+      `Airport status: ${status || 'none posted'}, as of ${asOf} PKT.`,
+      '',
+      `Live updates: ${window.location.href}`,
     ];
-    if (fsUrl) {
-      lines.push(`🔎 Live verification:`);
-      lines.push(`FlightStats: ${fsUrl}`);
-    }
-
-    if (airline.statusUrl && airline.statusUrl !== '#') {
-      lines.push(`🏢 Airline status:`);
-      lines.push(`${airline.name}: ${airline.statusUrl}`);
-    }
-    if (airline.contact && airline.contact !== 'N/A') {
-      lines.push(`📞 Helpline: ${airline.contact}`);
-    }
-
-    lines.push(`────────────────`);
-    lines.push(`🛫 Airport status check:`);
-    lines.push(pageUrl);
-
+    if (airline.contact && airline.contact !== 'N/A') lines.push(`${airline.name} helpline: ${airline.contact}`);
     return lines.join('\n');
   }
 
@@ -510,7 +449,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           chips.push(chip(fsUrlFor(d.guess), '🛰️ FlightStats', true));
           if (d.source === 'adb') credit = '<p class="check-credit">FlightStats day from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></p>';
         } else {
-          [dayBefore(date), date].forEach(iso => chips.push(chip(fsUrlFor(iso), `🛰️ FlightStats · left ${esc(dayLabel(iso))}`, true)));
+          // Not sure which day it left: both days, our guess (if any) first and marked
+          const days = d.guess === date ? [date, dayBefore(date)] : [dayBefore(date), date];
+          days.forEach((iso, n) => chips.push(chip(fsUrlFor(iso),
+            `${n === 0 ? '🛰️ FlightStats · ' : ''}left ${esc(dayLabel(iso))}${d.guess === iso ? ' (likely)' : ''}`, true)));
+          const from = latest.city && latest.city !== '—' ? esc(latest.city) : 'its origin';
+          credit = `<p class="check-credit">FlightStats lists flights by the day they leave ${from}.</p>`;
         }
       } else {
         chips.push(chip(fsUrlFor(date), '🛰️ FlightStats', true));
