@@ -459,15 +459,6 @@ def test_dry_run_sends_nothing():
     assert rc == 0 and sent == [] and cur.sql == []
 
 
-if __name__ == "__main__":
-    import inspect
-    tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and inspect.isfunction(f)]
-    for name, fn in tests:
-        fn()
-        print("ok", name)
-    print(f"{len(tests)} tests passed")
-
-
 def test_flight_the_page_did_list_is_still_asked_for():
     # Missing once, but a leg from that same page is held: the page does carry it, so keep reading it.
     f = flight("9P745", "Arrival", "Sharjah", "05:00", "05:30", "Expected")       # ET 30 min late: a gap
@@ -476,3 +467,12 @@ def test_flight_the_page_did_list_is_still_asked_for():
             log(pkt(D, "04:31"), "flyjinnah_route", "SHJ-ISB 2026-11-10", reason="sweep")]
     pages = run_plan([f], pkt(D, "06:15"), held={("9P745", "Arrival"): [leg]}, logs=seen)[0]
     assert ("flyjinnah_route", "SHJ-ISB 2026-11-11", "gap", ["9P745"]) in pages
+
+
+if __name__ == "__main__":
+    import inspect
+    tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and inspect.isfunction(f)]
+    for name, fn in tests:
+        fn()
+        print("ok", name)
+    print(f"{len(tests)} tests passed")
