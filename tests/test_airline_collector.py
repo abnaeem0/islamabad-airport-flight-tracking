@@ -234,14 +234,41 @@ def test_finished_flight_and_daily_flight_numbers():
 
 
 def test_empty_page_not_asked_again():
-    f = flight("9P711", "Arrival", "Dammam", "05:00", "05:00", "Expected")     # international, nothing held
+    def f():
+        return flight("9P711", "Arrival", "Dammam", "05:00", "05:00", "Expected")   # international, nothing held
+
     now = pkt(D, "01:10")
-    pages = run_plan([f], now)[0]
+    pages = run_plan([f()], now)[0]
     assert pages and all(p[0] == "flyjinnah_route" for p in pages)
     empties = [log(pkt(D, "00:50"), p[0], p[1], outcome="empty") for p in pages]
-    assert run_plan([f], pkt(D, "05:15"), logs=empties)[0] == []           # later checkpoint, same answer
+    assert run_plan([f()], pkt(D, "05:15"), logs=empties)[0] == []           # later checkpoint, same answer
     errors = [log(pkt(D, "00:50"), p[0], p[1], outcome="error") for p in pages]
-    assert len(run_plan([f], pkt(D, "05:15"), logs=errors)[0]) == len(pages)   # an error is retried
+    assert len(run_plan([f()], pkt(D, "05:15"), logs=errors)[0]) == len(pages)   # an error is retried
+    # 2026-11-11 04:00: SHJ-ISB answered empty once after listing 4 flights; that is a hiccup, not "no flights".
+    swept = [log(pkt(D, "04:31"), "flyjinnah_route", "DMM-ISB 2026-11-10", reason="sweep")]   # sweep done
+    hiccup = [dict(log(pkt(D, "00:30"), p[0], p[1]), missing=["9P711"]) for p in pages] \
+        + [dict(log(pkt(D, "00:50"), p[0], p[1], outcome="empty"), missing=["9P711"]) for p in pages] + swept
+    assert run_plan([f()], pkt(D, "05:15"), logs=hiccup)[0] == []                # ok answer lacked it: still sticky
+    hiccup = [log(pkt(D, "00:30"), p[0], p[1]) for p in pages] \
+        + [dict(log(pkt(D, "00:50"), p[0], p[1], outcome="empty"), missing=["9P711"]) for p in pages] + swept
+    assert len(run_plan([f()], pkt(D, "05:15"), logs=hiccup)[0]) == len(pages)   # empty after ok: asked again
+
+
+def test_flight_missing_from_a_page_stops_asking_for_it():
+    # 2026-11-11: SHJ-ISB 10 Nov answered with other flights but never 9P745; it was asked 7 times.
+    def f():
+        return flight("9P745", "Arrival", "Sharjah", "05:00", "05:00", "Expected")   # international, nothing held
+
+    def g():
+        return flight("9P747", "Arrival", "Sharjah", "06:30", "06:30", "Expected")
+
+    first = run_plan([f()], pkt(D, "02:20"))[0]
+    assert first
+    seen = [dict(log(pkt(D, "02:16"), p[0], p[1]), missing=["9P745"]) for p in first]
+    seen.append(log(pkt(D, "04:31"), "flyjinnah_route", "SHJ-ISB 2026-11-10", reason="sweep"))  # sweep done
+    assert run_plan([f()], pkt(D, "06:45"), logs=seen)[0] == []               # later checkpoint: not again
+    pages = run_plan([f(), g()], pkt(D, "06:45"), logs=seen)[0]               # another flight may still need it
+    assert pages and all(p[3] == ["9P747"] for p in pages)
 
 
 def test_departures_board_on_timer():
@@ -430,6 +457,16 @@ def test_dry_run_sends_nothing():
     flights = [flight("PK301", "Departure", "Karachi", "10:00", "10:00")]
     rc, sent, cur, _ = _fake_run(["--dry-run"], flights, {}, [], {}, pkt(D, "09:30"))
     assert rc == 0 and sent == [] and cur.sql == []
+
+
+def test_flight_the_page_did_list_is_still_asked_for():
+    # Missing once, but a leg from that same page is held: the page does carry it, so keep reading it.
+    f = flight("9P745", "Arrival", "Sharjah", "05:00", "05:30", "Expected")       # ET 30 min late: a gap
+    leg = {"origin": "SHJ", "dep_date": D, "sched_arr": pkt(D, "05:00").astimezone(UTC), "act_arr": None}
+    seen = [dict(log(pkt(D, "02:16"), "flyjinnah_route", "SHJ-ISB 2026-11-11"), missing=["9P745"]),
+            log(pkt(D, "04:31"), "flyjinnah_route", "SHJ-ISB 2026-11-10", reason="sweep")]
+    pages = run_plan([f], pkt(D, "06:15"), held={("9P745", "Arrival"): [leg]}, logs=seen)[0]
+    assert ("flyjinnah_route", "SHJ-ISB 2026-11-11", "gap", ["9P745"]) in pages
 
 
 if __name__ == "__main__":

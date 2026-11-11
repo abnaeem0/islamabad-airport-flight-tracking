@@ -317,6 +317,8 @@ def plan(flights, held_legs, log_rows, now, cfg):
 
     last_fetch = {}                       # (source, target) -> latest fetch time
     last_outcome = {}                     # (source, target) -> outcome of that latest fetch
+    not_on_page = defaultdict(set)        # (source, target) -> flights wanted but absent from an ok answer
+    answered_ok = set()                   # (source, target) pages that have listed flights at least once
     used_today = defaultdict(int)
     paused = set()
     today = now.astimezone(PKT).date()
@@ -327,6 +329,9 @@ def plan(flights, held_legs, log_rows, now, cfg):
         key = (r["source"], r["target"])
         last_fetch[key] = max(last_fetch.get(key, r["at"]), r["at"])
         last_outcome[key] = r["outcome"]              # rows are in time order, so the latest wins
+        if r["outcome"] == "ok":
+            answered_ok.add(key)
+            not_on_page[key].update(r.get("missing") or ())   # the page listed others but not these
         if r["at"].astimezone(PKT).date() == today:
             used_today[r["source"]] += 1
             if r["outcome"] == "blocked" and cfg["defaults"]["pause_on_block"]:
@@ -347,8 +352,10 @@ def plan(flights, held_legs, log_rows, now, cfg):
         last = last_fetch.get((page.source, page.target))
         if last is None:
             return False
-        if last_outcome.get((page.source, page.target)) == "empty":
+        if last_outcome.get((page.source, page.target)) == "empty" \
+                and (page.source, page.target) not in answered_ok:
             return True       # the airline lists nothing for that route and date; asking again won't help
+                              # (an empty answer after an ok one is a hiccup: normal refetch rules apply)
         if last >= since:
             return True
         gap = route_every if (stale and page.source != "pia_departures") else min_refetch
@@ -372,6 +379,10 @@ def plan(flights, held_legs, log_rows, now, cfg):
         if not stale and not has_gap(f, held, now, cfg):
             continue
         for p in pages_for(f):
+            listed = any(leg.get("origin") == p.origin and leg.get("dep_date") == p.day
+                         for leg in held_legs.get((f.number, f.kind), []))     # this page has carried it
+            if f.number in not_on_page.get((p.source, p.target), ()) and not listed:
+                continue      # that page was read and does not list this flight; asking again won't help
             if not fresh_enough(p, cp):
                 wanted[p].add(f.number)
                 reasons.setdefault(p, "fallback" if stale else "gap")
@@ -616,7 +627,7 @@ def read_state(conn, cur, airlines, today):
         """, (today - dt.timedelta(days=2),))
         legs = cur.fetchall()
         cur.execute("""
-            SELECT at, source, target, reason, outcome FROM public.airline_fetch_log
+            SELECT at, source, target, reason, outcome, missing FROM public.airline_fetch_log
             WHERE at >= now() - interval '2 days'
         """)
         log_rows = cur.fetchall()
