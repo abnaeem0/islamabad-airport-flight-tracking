@@ -201,8 +201,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `<span class="status-pill status-pill--${statusTone(status)}">${display(status || 'No status')}</span>`;
   }
 
-  // Islamabad's line: big time (expected if it differs, else scheduled), status, and the sub-line
-  function legHtml({ label, st, et, status }) {
+  // An airport's line: big time (expected if it differs, else scheduled), status, and the sub-line.
+  // Islamabad's is the primary line; the destination airport's (departures, BL-057) is smaller and
+  // adds its own source and freshness in `meta`.
+  function legHtml({ label, st, et, status, secondary = false, meta = '' }) {
     const d       = minutesDiff(st, et);
     const hasEt   = et != null && String(et).trim() !== '' && String(et).trim() !== String(st || '').trim();
     const bigTime = hasEt ? et : st;
@@ -212,13 +214,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       ? `Expected · scheduled ${display(st)}${dtxt ? ` · <strong class="delta delta--${d < 0 ? 'early' : 'late'}">${esc(dtxt)}</strong>` : ''}`
       : `${kind} · no expected time posted`;
     return `
-      <div class="leg leg--primary">
+      <div class="leg ${secondary ? 'leg--secondary' : 'leg--primary'}">
         <p class="leg-label">${label}</p>
         <div class="leg-main">
           <span class="leg-time">${display(bigTime)}</span>
           ${statusPill(status)}
         </div>
         <p class="leg-sub">${sub}</p>
+        ${meta ? `<p class="leg-meta">${meta}</p>` : ''}
       </div>`;
   }
 
@@ -538,6 +541,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let board    = 'isb';  // which history is showing: 'isb' or 'dep'
   let isbSnaps = [];
   let dep      = null;   // { row, snaps } for a matched domestic arrival, else null
+  let dest     = null;   // { row, snaps } for a matched domestic departure, else null (BL-057)
   let adb      = null;   // AeroDataBox origin leg for an arrival (adb_arrivals row), else null (BL-040)
   let isArrivalFlight = true;
 
@@ -592,6 +596,50 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Destination airport's arrival leg for an Islamabad departure (BL-057), from
+  // isb_departure_dest_view and origin_snapshots. Missing view, unmatched or any error -> null,
+  // and the page shows Islamabad's line only, as before.
+  async function fetchDestination(flightType) {
+    if (flightType !== 'Departure') return null;
+    try {
+      const { data, error } = await client
+        .from('isb_departure_dest_view')
+        .select('*')
+        .eq('flight_number', flightNumber)
+        .eq('departure_date', date)
+        .limit(1);
+      if (error || !data || !data.length || data[0].match_state !== 'matched') return null;
+      const row = data[0];
+      const res = await client
+        .from('origin_snapshots')
+        .select('scraped_at,status,st,et,change_type')
+        .eq('flight_number', row.flight_number)
+        .eq('scheduled_date', row.arrival_date)
+        .eq('type', 'Arrival')
+        .eq('source_airport', row.arrival_airport)
+        .order('scraped_at', { ascending: true });
+      return { row, snaps: (res.error || !res.data) ? [] : res.data };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // The destination's line under Islamabad's, with its own board name and age (BL-057)
+  function destinationLegHtml() {
+    if (!dest) return '';
+    const row     = dest.row;
+    const name    = display(row.arrival_airport);
+    const stale   = !row.arrival_checked || minutesSince(row.arrival_checked) > STALE_MINUTES;
+    const checked = row.arrival_checked ? esc(timeAgo(row.arrival_checked)) : 'unknown';
+    const day     = row.arrival_date && row.arrival_date !== date ? ` · ${esc(dayLabel(row.arrival_date))}` : '';
+    return legHtml({
+      label: `${name} · arrival${day}`,
+      st: row.arrival_st, et: row.arrival_et, status: row.arrival_status,
+      secondary: true,
+      meta: `${name} board · checked ${checked}${stale ? ` · <span class="board-stale">may be out of date</span>` : ''}`,
+    });
+  }
+
   // The one-line notice, or null. Only when the departure board is fresh and shows something
   // Islamabad's board does not: cancelled, departed, or NOTICE_MINUTES+ later than Islamabad.
   function departureNotice(isb) {
@@ -642,34 +690,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderBoard();
   });
 
-  // History section: Islamabad's board, or the departure airport's when picked
+  // History section: Islamabad's board, or the other airport's when picked
+  // (departure airport for arrivals, destination airport for departures)
+  function otherBoard() {
+    if (dep)  return { name: display(dep.row.departure_airport), list: 'departures',
+                       checked: dep.row.departure_checked, snaps: dep.snaps };
+    if (dest) return { name: display(dest.row.arrival_airport), list: 'arrivals',
+                       checked: dest.row.arrival_checked, snaps: dest.snaps };
+    return null;
+  }
+
   function renderBoard() {
-    const hasDep = !!(dep && dep.snaps.length);
-    if (!hasDep) board = 'isb';
+    const other    = otherBoard();
+    const hasOther = !!(other && other.snaps.length);
+    if (!hasOther) board = 'isb';
     const isbName = `Islamabad ${isArrivalFlight ? 'arrivals' : 'departures'}`;
 
-    if (!hasDep) {
+    if (!hasOther) {
       historyTitle.textContent = `${isbName} board history`;
       switchEl.hidden = true; switchEl.innerHTML = '';
       boardMetaEl.hidden = true; boardMetaEl.innerHTML = '';
+      isbCheckedEl.hidden = false;
       renderSnapshots(isbSnaps);
       return;
     }
 
-    const depName = display(dep.row.departure_airport);
     historyTitle.textContent = 'Airport board';
-    switchEl.innerHTML = [['isb', esc(isbName)], ['dep', `${depName} departures`]].map(([k, label]) =>
+    switchEl.innerHTML = [['isb', esc(isbName)], ['dep', `${other.name} ${other.list}`]].map(([k, label]) =>
       `<button type="button" data-board="${k}" class="${k === board ? 'is-on' : ''}" aria-pressed="${k === board}">${label}</button>`).join('');
     switchEl.hidden = false;
 
     if (board === 'dep') {
-      const row     = dep.row;
-      const stale   = !row.departure_checked || minutesSince(row.departure_checked) > STALE_MINUTES;
-      const checked = row.departure_checked ? esc(timeAgo(row.departure_checked)) : 'unknown';
-      boardMetaEl.innerHTML = `${depName} board · checked ${checked}${stale ? ` · <span class="board-stale">may be out of date</span>` : ''}`;
+      const stale   = !other.checked || minutesSince(other.checked) > STALE_MINUTES;
+      const checked = other.checked ? esc(timeAgo(other.checked)) : 'unknown';
+      boardMetaEl.innerHTML = `${other.name} board · checked ${checked}${stale ? ` · <span class="board-stale">may be out of date</span>` : ''}`;
       boardMetaEl.hidden = false;
-      isbCheckedEl.hidden = true;   // Islamabad's "Last checked" would read as Lahore's
-      renderSnapshots(dep.snaps);
+      isbCheckedEl.hidden = true;   // Islamabad's "Last checked" would read as the other airport's
+      renderSnapshots(other.snaps);
     } else {
       boardMetaEl.hidden = true; boardMetaEl.innerHTML = '';
       isbCheckedEl.hidden = false;
@@ -758,8 +815,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       isbSnaps        = snapshots;
       isArrivalFlight = isArrival;
-      [dep, adb]      = await Promise.all([fetchDeparture(first.type), fetchAdb(first.type)]);
-      flightInfoDiv.insertAdjacentHTML('beforeend', checkLinksHtml(snapshots));
+      [dep, adb, dest] = await Promise.all([fetchDeparture(first.type), fetchAdb(first.type), fetchDestination(first.type)]);
+      flightInfoDiv.insertAdjacentHTML('beforeend', destinationLegHtml() + checkLinksHtml(snapshots));
       renderNotice(latest);
       renderBoard();
 

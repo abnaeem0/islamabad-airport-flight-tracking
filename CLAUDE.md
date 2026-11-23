@@ -8,7 +8,7 @@ Only these two doc files exist (D-013). Do not create others. This repo is **pub
 A public flight-status site for **Islamabad International Airport** (Islamabad only, D-007).
 Audience: people in Islamabad, travellers coming in, the people picking them up, and hotel/transport staff.
 It polls the Pakistan Airports Authority (PAA) API, keeps current state per flight, records a snapshot only when something changes, and shows status plus change history.
-For domestic flights landing in Islamabad, the details page also shows what the departure airport reports, with its own source and freshness, in one card under Islamabad's line (BL-010C, BL-036).
+For domestic flights landing in Islamabad, the details page also shows what the departure airport reports, with its own source and freshness, in one card under Islamabad's line (BL-010C, BL-036). For domestic departures it shows the destination airport's arrival line the same way (BL-057).
 
 ## 2. Architecture (verified against the repo on 2026-11-01)
 
@@ -24,7 +24,7 @@ For domestic flights landing in Islamabad, the details page also shows what the 
 | Probes | `.github/workflows/aerodatabox_probe.yml` (manual, read-only) runs `probes/aerodatabox_probe.py` with secret `AERODATABOX_KEY` (BL-040). Writes nothing to the database | `probes/` |
 | Source | `https://paaconnectapi.paa.gov.pk/api/flights/{date}/{Arrival|Departure}/{city}`, unofficial, TLS verification disabled in both collectors (BL-027) | |
 
-**Website reads the origin tables** through `isb_flights_view`, `isb_snapshots_view` and `isb_arrival_origin_view` (plus `origin_snapshots` for the "first seen departed" line), and falls back to the old `flights` / `flight_snapshots` tables if a view errors (BL-032). `flight_canonical_view` is not used by any page.
+**Website reads the origin tables** through `isb_flights_view`, `isb_snapshots_view`, `isb_arrival_origin_view` and `isb_departure_dest_view` (plus `origin_snapshots` for the "first seen departed" line), and falls back to the old `flights` / `flight_snapshots` tables if a view errors (BL-032). `flight_canonical_view` is not used by any page.
 Data flow: PAA API -> collector (flatten, normalise flight number, compare with stored row) -> upsert current row, insert snapshot on change -> a non-terminal flight missing from a non-empty feed becomes `Dropped` -> browser queries Supabase.
 
 ## 3. Conventions
@@ -51,6 +51,7 @@ Data flow: PAA API -> collector (flatten, normalise flight number, compare with 
 | `origin_scraper_status` | new health; row `scraper_id=paa_origin` |
 | `source_priority` | source registry; `data_source`, `priority`. Rows (2026-11-02): `paa` 10 (in use), `airline_web` 20 and `adsb` 30 (registered, no collector yet) |
 | `isb_arrival_origin_view` | applied 2026-11-04: pairs each Islamabad arrival with the departure leg from the origin airport (rules in PLAN.md section 5); not in the repo as a file, SQL is in PLAN.md |
+| `isb_departure_dest_view` | BL-057: pairs each Islamabad departure with the arrival leg from the destination airport (mirror of the arrival view; SQL in PLAN.md section 5) |
 | `adb_arrivals` | AeroDataBox origin leg per Islamabad arrival (BL-040); PK flight number + scheduled arrival (UTC); rows deleted after 7 days; RLS on, not read by the site yet |
 | `adb_runs` | one row per AeroDataBox call: slot, window, HTTP status, counts, comparison with PAA, units left; kept |
 | `airline_legs` | airline-reported leg (BL-051): PK flight number, origin-local departure date, origin; scheduled/estimated/actual times at both ends (`timestamptz`), Fly Jinnah takeoff/touchdown, raw page data; deleted after 7 days; RLS on, no policies, not read by the site yet |

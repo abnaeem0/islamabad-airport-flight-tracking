@@ -1,11 +1,12 @@
 # PLAN.md: Islamabad Flight Tracker
 
 Spec, decisions, backlog, journal and the current handoff, in one place. Stable rules and architecture are in `CLAUDE.md`.
-This merges the repo's earlier doc set (`AGENTS.md`, `docs/SPEC|BACKLOG|DECISIONS|JOURNAL|DB|WORKFLOW.md`, dated 2026-09-30) and keeps its task IDs. Last updated: 2026-11-11.
+This merges the repo's earlier doc set (`AGENTS.md`, `docs/SPEC|BACKLOG|DECISIONS|JOURNAL|DB|WORKFLOW.md`, dated 2026-09-30) and keeps its task IDs. Last updated: 2026-11-23.
 Public repo: no email, phone, credentials or security details in this file.
 
 ## 1. Current handoff
 
+- **2026-11-23 (night):** BL-057 built (owner: "let's make it, we can always revert"). Departure details pages now show the destination airport's arrival line under Islamabad's (e.g. "Karachi · arrival 09:05 Landed", with that board's age), and the history switch offers "<city> arrivals". It needs one new view: **owner runs the BL-057 SQL in section 5 in the Supabase SQL editor**, then opens a few Islamabad-Karachi/Lahore departures. Until the SQL is run, the page looks exactly as before. Checked on a local Postgres with 10 fixture cases and in a stubbed browser (7 cases x 4 widths); not checked on the live site. Rollback: revert the PR; `DROP VIEW IF EXISTS public.isb_departure_dest_view;`.
 - **2026-11-11 (afternoon):** notes only, nothing built. BL-052 (airline times on the site) design agreed with the owner: notice only when the airline's site knows more; when it agrees with the airport, one quiet "matches PIA's website" line instead of small time differences; the airline is probably closer to the truth but its reading can be old, so its age always shows. Start after about a week of BL-051 data (around 18 Nov). New: BL-055 (Fly Jinnah's `D` suffix for retimed flights, needed before BL-052 shows Fly Jinnah cancellations), BL-056 (watch the airline sources for blocks, weekly for the first month). Airblue still pending (BL-053).
 - **2026-11-11 (later still):** BL-054 share message rewritten as plain sentences (works offline: flight, where from/to, time, how late, airport status with the time we checked, our link, airline helpline) with an optional booking reference "for your own reference". FlightStats left the message and the share box no longer asks which day; when the day is unknown the page's chips offer both days, our guess marked "(likely)". Merged by the owner's instruction, checked in a stubbed browser only. Owner: share a few flights to yourself on WhatsApp and read them on the phone.
 - **2026-11-11 (later):** BL-051's first live morning checked from the GitHub run logs (00:39 to 10:07 PKT): 58 of 58 runs succeeded, 66 airline requests (58 answered with flights, 8 empty), no blocks or errors, 51 legs held, never more than 6 requests in a run. Problem found: Fly Jinnah used its whole daily cap of 30 by 09:27, mostly re-reading pages that answer but do not list the wanted flight (SHJ-ISB 10 Nov asked 7 times for 9P745; KHI-ISB 10 Nov 4 times for 9P678). Fixed (merged by the owner's standing instruction): a flight is not asked again from a page that answered without it, and an empty answer after a good one counts as a hiccup, not "no flights". About a third of the morning's Fly Jinnah requests would not have been sent. Today's Fly Jinnah cap stays used until midnight PKT. Owner: nothing to do; optionally run the BL-051 health queries tomorrow.
@@ -86,7 +87,7 @@ Entry template: `D-### title; date; status (Proposed/Accepted/Implemented/Supers
 
 ## 4. Backlog
 
-One queue. IDs are never reused. Next unused ID: **BL-057**. BL-010A..D are children of BL-010.
+One queue. IDs are never reused. Next unused ID: **BL-058**. BL-010A..D are children of BL-010.
 States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a local mock, not yet applied or saved) -> Testing (applied, checks incomplete) -> Done; Blocked at any stage; Deferred/Cancelled keep a reason. P0 active outage or data loss; P1 correctness, security or reliability; P2 useful next capability; P3 later. Size S one small checkable change; M split into checkpoints; L parent only. Confidence: owner report / code evidence / catalog evidence / reproduced. Done needs applied + checks passed + saved commit or backup. All items below are **unimplemented** unless a note says otherwise.
 
 | ID | Type | Pri | Size | State | Task |
@@ -148,6 +149,7 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 | BL-052 | feature | P2 | S | Ready | Show airline-reported times on the flight page: a notice only when the airline's site knows more than Islamabad's board, a quiet "matches" line when they agree; source and age always. Design agreed 2026-11-11; start after about a week of BL-051 data |
 | BL-054 | feature | P2 | S | Testing | Share message in plain sentences (readable offline) with our link and the airline helpline; optional booking reference; no FlightStats link and no day question in the share box (the page's chips handle FlightStats, both days when unsure). Merged 2026-11-11; live check pending |
 | BL-055 | bug | P2 | S | Inbox | Fly Jinnah lists a retimed flight twice: the original number `CANCELED` and the new time with a `D` suffix (9P745 / 9P745D, 11 Nov). Match the `D` leg to PAA's flight and don't read the original as a cancellation |
+| BL-057 | feature | P1 | S | Testing | Departures: show the destination airport's arrival line (landed/expected) under Islamabad's, from new view `isb_departure_dest_view`; history switch "<city> arrivals". Watched airports only (Karachi, Lahore, Peshawar, Faisalabad, Multan). Built 2026-11-23; SQL to apply, live check pending |
 | BL-056 | chore | P2 | S | Ready | Watch the airline sources for blocks and breakage: weekly for BL-051's first month, then monthly with BL-044 item 8 |
 | BL-053 | research | P3 | S | Blocked | Airblue: its status pages answer scripts with a Cloudflare check; ask Airblue for permission (a fixed IP to allow, or browser automation at a low rate). Adapter stays off until they agree |
 
@@ -382,6 +384,13 @@ States: Inbox -> Ready -> Doing -> **Proposed** (edit prepared and checked in a 
 - On a block: leave it paused (it retries once the next day), make that source gentler in `airline_sources.toml` (lower `daily_cap`, longer `every_minutes`) or set `enabled = false`; never work around a check page (D-016). On `parse_fail`: the airline changed its page; capture one page and update the parser and fixtures.
 - Claude can do the check from the GitHub run logs when asked. Accept: four weekly checks recorded in the journal, each with nothing found or the action taken.
 
+**BL-057** *New 2026-11-23 (owner: "I dropped a guest and want to check the link to see they reached safely").* The origin collector already reads the arrivals boards of the five watched airports, so a departure from Islamabad can be paired with the destination's arrival row, the mirror of BL-010B. Built:
+- View `isb_departure_dest_view` (SQL and rules in section 5): each Islamabad departure with the arrival leg reported by its destination, same day or next, 0 to 6 h after departure, mutual best, highest-priority source.
+- `docs/flight_detail.js`: for departures, a smaller second line in the journey card: "<city> · arrival" (plus the day when it lands the next day), time, the board's own status, and "<city> board · checked N min ago", with "may be out of date" after 60 min. The history switch reads "Islamabad departures / <city> arrivals". Missing view, unmatched flight or any error: no line, page as before. No notice and no share-message change (possible follow-ups). `docs/style.css`: `.leg--secondary`, `.leg-meta`.
+- Not covered: destinations we don't watch (Skardu, Quetta, international): Islamabad's own "Departed" only. Multan returns PAA errors (BL-033).
+- Checks done: local Postgres 16, 10 fixtures (same day, overnight, daily flight both days, international, no arrival row, empty time, gap over 6 h, arrival before departure, wrong-airport row, two sources) all as expected, no duplicates; stubbed browser at 320/375/768/1280 px for matched, overnight, stale, unmatched, view missing, hostile city/status text, and an arrival (unchanged): no sideways scroll, no script errors, hostile text shown as text.
+- Accept (owner): after the SQL, `SELECT match_state, count(*) FROM public.isb_departure_dest_view GROUP BY 1;` shows matched rows; a landed Islamabad-Karachi departure shows "Karachi · arrival" with Landed; an international departure shows no second line.
+
 ### Applied edits (merged 2026-11-01, commit `9d4e72f`, PR #5)
 
 Files: `docs/index.html`, `flight_detail.html`, `about.html`, `contact.html`, `flight_detail.js`, `script.js`, `style.css`. Saved as one squashed commit, so one revert (the Revert button on PR #5) undoes all of it. Owner reported the live checks done on 2026-11-01. Still open: BL-028 (needs the form key and a real test message), the BL-023 city/filter part, BL-024, and the `scraped_at` check under BL-009.
@@ -487,6 +496,74 @@ LEFT JOIN dep d ON d.flight_number = p.flight_number AND d.scheduled_date = p.de
 GRANT SELECT ON public.isb_arrival_origin_view TO anon, authenticated;
   ```
   Checks after applying: `SELECT match_state, count(*) FROM public.isb_arrival_origin_view GROUP BY 1;` returns both `matched` and `unmatched` once domestic data exists; `SELECT * FROM public.isb_arrival_origin_view WHERE departure_date <> arrival_date LIMIT 5;` shows any overnight pairs; the same flight number and date never appears twice. Rollback: `DROP VIEW IF EXISTS public.isb_arrival_origin_view;` (nothing else depends on it; the details page hides its box when the view is missing).
+- **BL-057 view: pairing rules.** The mirror of BL-010B. For each Islamabad departure, the arrival leg is the row of the same flight number, listed by the airport the departure says it goes to, whose origin is Islamabad, with a scheduled arrival on the departure date or the day after, at or after the scheduled departure and no more than 6 hours later. Smallest gap wins; mutual best only; missing or unreadable times are never guessed (`unmatched`). Within one leg: highest priority, newest `last_checked`, then source name.
+- **BL-057 view SQL** (target: Supabase SQL editor; prerequisites as BL-010B; creates one view and one grant, changes no data).
+  ```sql
+-- BL-057: pairs each Islamabad DEPARTURE with the arrival leg reported by the destination airport.
+CREATE OR REPLACE VIEW public.isb_departure_dest_view
+WITH (security_invoker = true) AS
+WITH base AS (
+  SELECT f.*, sp.priority,
+         CASE WHEN f.st ~ '^\d{1,2}:\d{2}' THEN
+           (f.scheduled_date + substring(f.st from '^\d{1,2}:\d{2}')::time) END AS st_ts
+  FROM public.origin_flights f
+  JOIN public.source_priority sp USING (data_source)
+),
+dep AS (   -- best-ranked Islamabad departure row per flight/date
+  SELECT DISTINCT ON (flight_number, scheduled_date)
+         flight_number, scheduled_date, destination_city, status, st, et, st_ts,
+         data_source, last_checked
+  FROM base
+  WHERE type = 'Departure' AND source_airport = 'Islamabad'
+  ORDER BY flight_number, scheduled_date, priority DESC, last_checked DESC, data_source
+),
+arr AS (   -- best-ranked arrival row per flight/date/airport reported by the destination airport
+  SELECT DISTINCT ON (flight_number, scheduled_date, source_airport)
+         flight_number, scheduled_date, source_airport, origin_city, status, st, et,
+         st_ts, data_source, last_checked, last_updated
+  FROM base
+  WHERE type = 'Arrival' AND source_airport <> 'Islamabad' AND origin_city = 'Islamabad'
+  ORDER BY flight_number, scheduled_date, source_airport, priority DESC, last_checked DESC, data_source
+),
+cand AS (  -- arrival at or after departure, within 6 hours; gap known only if both times parse
+  SELECT d.flight_number, d.scheduled_date AS dep_date, a.scheduled_date AS arr_date,
+         a.source_airport,
+         extract(epoch FROM a.st_ts - d.st_ts) AS gap_s
+  FROM dep d
+  JOIN arr a ON a.flight_number = d.flight_number
+            AND a.source_airport = d.destination_city
+            AND a.scheduled_date BETWEEN d.scheduled_date AND d.scheduled_date + 1
+  WHERE d.st_ts IS NOT NULL AND a.st_ts IS NOT NULL
+    AND a.st_ts - d.st_ts BETWEEN interval '0' AND interval '6 hours'
+),
+ranked AS (
+  SELECT c.*,
+         row_number() OVER (PARTITION BY flight_number, dep_date ORDER BY gap_s, arr_date) AS rn_dep,
+         row_number() OVER (PARTITION BY flight_number, arr_date, source_airport ORDER BY gap_s, dep_date DESC) AS rn_arr
+  FROM cand c
+),
+pairs AS (  -- mutual best only
+  SELECT * FROM ranked WHERE rn_dep = 1 AND rn_arr = 1
+)
+SELECT d.flight_number,
+       d.scheduled_date AS departure_date,
+       d.destination_city,
+       d.status   AS departure_status, d.st AS departure_st, d.et AS departure_et,
+       d.last_checked AS departure_checked,
+       p.arr_date AS arrival_date,
+       a.source_airport AS arrival_airport,
+       a.status   AS arrival_status, a.st AS arrival_st, a.et AS arrival_et,
+       a.data_source AS arrival_source,
+       a.last_checked AS arrival_checked,
+       a.last_updated AS arrival_last_updated,
+       CASE WHEN p.flight_number IS NULL THEN 'unmatched' ELSE 'matched' END AS match_state
+FROM dep d
+LEFT JOIN pairs p ON p.flight_number = d.flight_number AND p.dep_date = d.scheduled_date
+LEFT JOIN arr a ON a.flight_number = p.flight_number AND a.scheduled_date = p.arr_date
+               AND a.source_airport = p.source_airport;
+GRANT SELECT ON public.isb_departure_dest_view TO anon, authenticated;
+  ```
+  Checks after applying: `SELECT match_state, count(*) FROM public.isb_departure_dest_view GROUP BY 1;` returns `matched` rows for domestic departures; `SELECT * FROM public.isb_departure_dest_view WHERE arrival_date <> departure_date LIMIT 5;` shows any overnight pairs; `SELECT flight_number, departure_date FROM public.isb_departure_dest_view GROUP BY 1,2 HAVING count(*) > 1;` returns nothing. Rollback: `DROP VIEW IF EXISTS public.isb_departure_dest_view;` (the page hides the line when the view is missing).
 - **BL-032 views** (target: Supabase SQL editor; prerequisites: `origin_flights`, `origin_snapshots`, `source_priority`; creates two views and grants, no data changes). They show only Islamabad rows, in the same column shape as the old tables (`city` is the origin for arrivals and the destination for departures), one row per flight, date and direction, highest-priority source first.
   ```sql
 -- BL-032: Islamabad-only views over the origin tables, shaped like the old flights / flight_snapshots tables.
@@ -525,6 +602,10 @@ GRANT SELECT ON public.isb_flights_view, public.isb_snapshots_view TO anon, auth
 - Checks (stubbed browser, 2026-11-10): PIA arrival (one FlightStats chip, status, call), Emirates night arrival (two day chips), PIA departure, South Air (call only), registration (no row), HTML in city text; FlightStats chip matches the share message link; no sideways scroll at 320/390/1280 px; no script errors. Not yet seen on a real phone.
 
 ## 7. Journal (newest first)
+
+### 2026-11-23 | Claude | BL-057 destination line for departures
+- Done: owner asked to see when a departure lands in Karachi. Found the arrivals boards of the watched airports already collected; wrote `isb_departure_dest_view` (mirror of BL-010B) and the departure page's second line and history switch. Tested on a local Postgres and in a stubbed browser. Owner skipped mockups ("we can always revert").
+- Next: owner runs the BL-057 SQL, then checks a few live departures.
 
 ### 2026-11-11 (afternoon) | Claude | BL-052 design, BL-055, BL-056
 - Done: owner asked whether airline data reaches the site (not yet) and what it would look like. Showed three mockups using PK786 London-Islamabad; owner chose the notice (option A) with a quiet "matches" line when the airline agrees, and stressed staleness. Recorded in BL-052; added BL-055 (Fly Jinnah `D` suffix) and BL-056 (watch for blocks); Airblue still pending (BL-053). Nothing built.
